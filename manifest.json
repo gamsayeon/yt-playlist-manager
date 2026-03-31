@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "yt-playlist-manager",
+  "version": "0.1.0",
+  "description": "YouTube 검색·홈 화면에서 영상을 일괄 선택하고 재생목록을 관리하는 Chrome Extension",
+
+  "oauth2": {
+    "client_id": "__VITE_OAUTH_CLIENT_ID__",
+    "scopes": [
+      "https://www.googleapis.com/auth/youtube"
+    ]
+  },
+
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+
+  "action": {
+    "default_title": "yt-playlist-manager",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+
+  "permissions": [
+    "storage",
+    "identity",
+    "sidePanel"
+  ],
+
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://www.googleapis.com/*"
+  ],
+
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  }
+}
