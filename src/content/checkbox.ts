@@ -83,14 +83,27 @@ function createCheckbox(videoInfo: VideoInfo): HTMLElement {
     accent-color: #ff0000;
   `;
 
-  input.addEventListener("change", () => {
-    wrapper.dataset.checked = String(input.checked);
-    wrapper.dispatchEvent(
-      new CustomEvent("yt-checkbox-change", {
-        bubbles: true,
-        detail: { videoInfo, checked: input.checked },
-      })
+  input.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  input.addEventListener("change", (e) => {
+    e.stopPropagation();
+
+    const messageType = input.checked
+      ? "ADD_TO_TEMP_LIST"
+      : "REMOVE_FROM_TEMP_LIST";
+
+    chrome.runtime.sendMessage(
+      { type: messageType, payload: videoInfo },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("[YT Playlist Manager] sendMessage error", chrome.runtime.lastError);
+        }
+      }
     );
+
+    wrapper.dataset.checked = String(input.checked);
   });
 
   wrapper.appendChild(input);
