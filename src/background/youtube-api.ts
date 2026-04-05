@@ -24,6 +24,7 @@ interface YouTubePlaylistItem {
 /** YouTube API 재생목록 응답 wrapper 타입 */
 interface YouTubePlaylistResponse {
   items: YouTubePlaylistItem[];
+  nextPageToken?: string;
 }
 
 /** YouTube API 단일 재생목록 응답 타입 */
@@ -70,17 +71,31 @@ async function fetchWithAuth(
   return response;
 }
 
-/** 재생목록 목록 조회 */
+/** 재생목록 목록 조회 (페이지네이션 적용) */
 export async function getPlaylists(): Promise<Playlist[]> {
-  const url = `${BASE_URL}/playlists?part=snippet,contentDetails&mine=true&maxResults=50`;
-  const response = await fetchWithAuth(url);
-  const data: YouTubePlaylistResponse = await response.json();
+  const playlists: Playlist[] = [];
+  let pageToken: string | undefined;
 
-  return data.items.map((item: YouTubePlaylistItem) => ({
-    id: item.id,
-    title: item.snippet.title,
-    itemCount: item.contentDetails.itemCount,
-  }));
+  do {
+    const url = `${BASE_URL}/playlists?part=snippet,contentDetails&mine=true&maxResults=50${
+      pageToken ? `&pageToken=${pageToken}` : ""
+    }`;
+
+    const response = await fetchWithAuth(url);
+    const data: YouTubePlaylistResponse = await response.json();
+
+    data.items.forEach((item: YouTubePlaylistItem) => {
+      playlists.push({
+        id: item.id,
+        title: item.snippet.title,
+        itemCount: item.contentDetails.itemCount,
+      });
+    });
+
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return playlists;
 }
 
 /** 재생목록 생성 */
@@ -106,7 +121,7 @@ export async function updatePlaylist(
   playlistId: string,
   title: string
 ): Promise<Playlist> {
-  const url = `${BASE_URL}/playlists?part=snippet`;
+  const url = `${BASE_URL}/playlists?part=snippet,contentDetails`;
   const response = await fetchWithAuth(url, {
     method: "PUT",
     body: JSON.stringify({
@@ -119,7 +134,7 @@ export async function updatePlaylist(
   return {
     id: data.id,
     title: data.snippet.title,
-    itemCount: 0,
+    itemCount: data.contentDetails?.itemCount ?? 0,
   };
 }
 

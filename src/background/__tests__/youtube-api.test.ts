@@ -8,7 +8,6 @@ import {
   QuotaExceededError,
 } from "../youtube-api";
 
-// auth 모킹
 jest.mock("../auth", () => ({
   getAuthToken: jest.fn().mockResolvedValue("mock-token"),
   refreshAuthToken: jest.fn().mockResolvedValue("new-mock-token"),
@@ -48,6 +47,44 @@ describe("getPlaylists", () => {
       { id: "pl2", title: "재생목록 2", itemCount: 5 },
     ]);
   });
+
+  it("nextPageToken이 있으면 다음 페이지를 조회한다", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: "pl1",
+              snippet: { title: "재생목록 1" },
+              contentDetails: { itemCount: 3 },
+            },
+          ],
+          nextPageToken: "token123",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: "pl2",
+              snippet: { title: "재생목록 2" },
+              contentDetails: { itemCount: 5 },
+            },
+          ],
+        }),
+      });
+
+    const result = await getPlaylists();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result).toEqual([
+      { id: "pl1", title: "재생목록 1", itemCount: 3 },
+      { id: "pl2", title: "재생목록 2", itemCount: 5 },
+    ]);
+  });
 });
 
 describe("createPlaylist", () => {
@@ -68,7 +105,22 @@ describe("createPlaylist", () => {
 });
 
 describe("updatePlaylist", () => {
-  it("재생목록 제목을 수정하고 반환한다", async () => {
+  it("재생목록 제목을 수정하고 itemCount를 반환한다", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "pl1",
+        snippet: { title: "수정된 제목" },
+        contentDetails: { itemCount: 5 },
+      }),
+    });
+
+    const result = await updatePlaylist("pl1", "수정된 제목");
+    expect(result).toEqual({ id: "pl1", title: "수정된 제목", itemCount: 5 });
+  });
+
+  it("contentDetails가 없으면 itemCount를 0으로 반환한다", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -107,9 +159,7 @@ describe("addItemToPlaylist", () => {
       json: async () => ({}),
     });
 
-    await expect(
-      addItemToPlaylist("pl1", "video1")
-    ).resolves.toBeUndefined();
+    await expect(addItemToPlaylist("pl1", "video1")).resolves.toBeUndefined();
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("playlistItems"),
       expect.objectContaining({ method: "POST" })
