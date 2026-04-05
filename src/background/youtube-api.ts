@@ -41,23 +41,24 @@ interface YouTubePlaylistSingleResponse {
 /** 인증된 fetch 요청 (401 시 토큰 재발급 후 1회 재시도, 403 시 Quota 안내) */
 async function fetchWithAuth(
   url: string,
-  options: RequestInit = {},
-  isRetry = false
+  options: RequestInit = {}
 ): Promise<Response> {
-  const token = await getAuthToken(false);
+  const makeRequest = (token: string) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
+  let token = await getAuthToken(false);
+  let response = await makeRequest(token);
 
-  if (response.status === 401 && !isRetry) {
-    await refreshAuthToken(token);
-    return fetchWithAuth(url, options, true);
+  if (response.status === 401) {
+    const newToken = await refreshAuthToken(token);
+    response = await makeRequest(newToken);
   }
 
   if (response.status === 403) {

@@ -212,7 +212,7 @@ describe("fetchWithAuth 공통 처리", () => {
     expect(result).toEqual([{ id: "pl1", title: "재생목록 1", itemCount: 3 }]);
   });
 
-  it("401 응답이 반복되면 재시도하지 않는다", async () => {
+  it("401 응답이 반복되면 에러를 던진다", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 401,
