@@ -1,4 +1,4 @@
-const OBSERVER_THROTTLE_MS = 200;
+const OBSERVER_THROTTLE_MS = 300;
 
 let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 
