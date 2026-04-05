@@ -1,3 +1,5 @@
+import { MessageResponse } from "../types/message";
+
 const loginView = document.getElementById("login-view") as HTMLDivElement;
 const mainView = document.getElementById("main-view") as HTMLDivElement;
 const loginBtn = document.getElementById("login-btn") as HTMLButtonElement;
@@ -29,10 +31,10 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.disabled = true;
   loginBtn.textContent = "로그인 중...";
 
-  const response = await chrome.runtime.sendMessage({ type: "LOGIN" });
+  const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGIN" });
 
   if (response.success) {
-    showMainView(response.userId);
+    showMainView(response.userId as string);
   } else {
     alert(`로그인 실패: ${response.error}`);
     loginBtn.disabled = false;
@@ -41,12 +43,17 @@ loginBtn.addEventListener("click", async () => {
 });
 
 logoutBtn.addEventListener("click", async () => {
-  const response = await chrome.runtime.sendMessage({ type: "LOGOUT" });
+  logoutBtn.disabled = true;
+  logoutBtn.textContent = "로그아웃 중...";
+
+  const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGOUT" });
 
   if (response.success) {
     showLoginView();
   } else {
     alert(`로그아웃 실패: ${response.error}`);
+    logoutBtn.disabled = false;
+    logoutBtn.textContent = "로그아웃";
   }
 });
 
