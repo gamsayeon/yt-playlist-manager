@@ -10,6 +10,33 @@ export class QuotaExceededError extends Error {
   }
 }
 
+/** YouTube API 재생목록 응답 타입 */
+interface YouTubePlaylistItem {
+  id: string;
+  snippet: {
+    title: string;
+  };
+  contentDetails: {
+    itemCount: number;
+  };
+}
+
+/** YouTube API 재생목록 응답 wrapper 타입 */
+interface YouTubePlaylistResponse {
+  items: YouTubePlaylistItem[];
+}
+
+/** YouTube API 단일 재생목록 응답 타입 */
+interface YouTubePlaylistSingleResponse {
+  id: string;
+  snippet: {
+    title: string;
+  };
+  contentDetails?: {
+    itemCount: number;
+  };
+}
+
 /** 인증된 fetch 요청 (401 시 토큰 재발급 후 1회 재시도, 403 시 Quota 안내) */
 async function fetchWithAuth(
   url: string,
@@ -47,9 +74,9 @@ async function fetchWithAuth(
 export async function getPlaylists(): Promise<Playlist[]> {
   const url = `${BASE_URL}/playlists?part=snippet,contentDetails&mine=true&maxResults=50`;
   const response = await fetchWithAuth(url);
-  const data = await response.json();
+  const data: YouTubePlaylistResponse = await response.json();
 
-  return data.items.map((item: any) => ({
+  return data.items.map((item: YouTubePlaylistItem) => ({
     id: item.id,
     title: item.snippet.title,
     itemCount: item.contentDetails.itemCount,
@@ -65,7 +92,7 @@ export async function createPlaylist(title: string): Promise<Playlist> {
       snippet: { title },
     }),
   });
-  const data = await response.json();
+  const data: YouTubePlaylistSingleResponse = await response.json();
 
   return {
     id: data.id,
@@ -87,7 +114,7 @@ export async function updatePlaylist(
       snippet: { title },
     }),
   });
-  const data = await response.json();
+  const data: YouTubePlaylistSingleResponse = await response.json();
 
   return {
     id: data.id,
