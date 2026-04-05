@@ -1,8 +1,9 @@
 import { login, logout } from "./auth";
+import { Message } from "../types/message";
 
 console.log("[YT Playlist Manager] service worker loaded");
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
   if (message.type === "LOGIN") {
     login()
       .then((userId) => sendResponse({ success: true, userId }))
@@ -16,4 +17,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => sendResponse({ success: false, error }));
     return true;
   }
+
+  return false;
 });

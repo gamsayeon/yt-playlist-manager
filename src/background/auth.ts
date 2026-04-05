@@ -31,7 +31,7 @@ export async function refreshAuthToken(): Promise<string> {
 }
 
 /** YouTube 채널 ID 조회 */
-async function fetchUserId(token: string): Promise<string> {
+async function fetchUserId(token: string, isRetry = false): Promise<string> {
   const response = await fetch(
     "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
     {
@@ -39,9 +39,9 @@ async function fetchUserId(token: string): Promise<string> {
     }
   );
 
-  if (response.status === 401) {
+  if (response.status === 401 && !isRetry) {
     const newToken = await refreshAuthToken();
-    return fetchUserId(newToken);
+    return fetchUserId(newToken, true);
   }
 
   if (!response.ok) {
