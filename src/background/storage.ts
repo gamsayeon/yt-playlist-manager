@@ -80,4 +80,20 @@ export async function getCachedPlaylists(): Promise<Playlist[] | null> {
   return getStorage<Playlist[]>(STORAGE_KEYS.CACHED_PLAYLISTS);
 }
 
+/** 캐시된 재생목록 저장 */
+export async function setCachedPlaylists(playlists: Playlist[]): Promise<void> {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.CACHED_PLAYLISTS]: playlists,
+    [STORAGE_KEYS.CACHED_PLAYLISTS_AT]: Date.now(),
+  });
+}
+
+/** 캐시 무효화 */
+export async function invalidatePlaylists(): Promise<void> {
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.CACHED_PLAYLISTS,
+    STORAGE_KEYS.CACHED_PLAYLISTS_AT,
+  ]);
+}
+
 export { STORAGE_KEYS };
