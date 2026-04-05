@@ -73,8 +73,14 @@ export async function logout(): Promise<void> {
   const token = await getAuthToken(false).catch(() => null);
 
   if (token) {
-    await new Promise<void>((resolve) => {
-      chrome.identity.removeCachedAuthToken({ token }, () => resolve());
+    await new Promise<void>((resolve, reject) => {
+      chrome.identity.removeCachedAuthToken({ token }, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError.message);
+          return;
+        }
+        resolve();
+      });
     });
   }
 
