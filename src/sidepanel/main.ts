@@ -7,11 +7,16 @@ const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
 const userInfo = document.getElementById("user-info") as HTMLParagraphElement;
 
 async function init(): Promise<void> {
-  const { userId } = await chrome.storage.local.get("userId");
+  try {
+    const { userId } = await chrome.storage.local.get("userId");
 
-  if (userId) {
-    showMainView(userId);
-  } else {
+    if (userId) {
+      showMainView(userId);
+    } else {
+      showLoginView();
+    }
+  } catch (error) {
+    console.error("초기화 실패:", error);
     showLoginView();
   }
 }
@@ -26,6 +31,18 @@ function showMainView(userId: string): void {
   mainView.classList.remove("hidden");
   userInfo.textContent = `채널 ID: ${userId}`;
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !("userId" in changes)) return;
+
+  const { newValue } = changes.userId;
+
+  if (newValue) {
+    showMainView(newValue);
+  } else {
+    showLoginView();
+  }
+});
 
 loginBtn.addEventListener("click", async () => {
   try {
