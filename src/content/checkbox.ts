@@ -1,4 +1,3 @@
-const CHECKBOX_CLASS = "yt-playlist-manager-checkbox";
 const ITEM_SELECTOR = "ytd-rich-item-renderer";
 
 export interface VideoInfo {
@@ -63,7 +62,7 @@ function parseVideoInfo(item: Element): VideoInfo | null {
 /** 체크박스 생성 */
 function createCheckbox(videoInfo: VideoInfo): HTMLElement {
   const wrapper = document.createElement("div");
-  wrapper.className = CHECKBOX_CLASS;
+  wrapper.setAttribute("data-ytpm-checkbox", "true");
   wrapper.dataset.videoId = videoInfo.videoId;
   wrapper.style.cssText = `
     position: absolute;
@@ -103,7 +102,7 @@ export function injectCheckboxes(): void {
   const items = document.querySelectorAll(ITEM_SELECTOR);
 
   items.forEach((item) => {
-    if (item.querySelector(`.${CHECKBOX_CLASS}`)) return;
+    if (item.querySelector("[data-ytpm-checkbox]")) return;
 
     const videoInfo = parseVideoInfo(item);
     if (!videoInfo) return;
@@ -122,5 +121,5 @@ export function injectCheckboxes(): void {
 
 /** 모든 체크박스 제거 */
 export function removeCheckboxes(): void {
-  document.querySelectorAll(`.${CHECKBOX_CLASS}`).forEach((el) => el.remove());
+  document.querySelectorAll("[data-ytpm-checkbox]").forEach((el) => el.remove());
 }
