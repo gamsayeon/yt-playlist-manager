@@ -28,32 +28,40 @@ function showMainView(userId: string): void {
 }
 
 loginBtn.addEventListener("click", async () => {
-  loginBtn.disabled = true;
-  loginBtn.textContent = "로그인 중...";
+  try {
+    loginBtn.disabled = true;
+    loginBtn.textContent = "로그인 중...";
 
-  const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGIN" });
+    const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGIN" });
 
-  if (response.success) {
-    showMainView(response.userId as string);
-  } else {
-    alert(`로그인 실패: ${response.error}`);
+    if (response.success) {
+      showMainView(response.userId as string);
+    } else {
+      alert(`로그인 실패: ${response.error}`);
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
     loginBtn.disabled = false;
     loginBtn.textContent = "Google 계정으로 로그인";
   }
 });
 
 logoutBtn.addEventListener("click", async () => {
-  logoutBtn.disabled = true;
-  logoutBtn.textContent = "로그아웃 중...";
+  try {
+    logoutBtn.disabled = true;
+    logoutBtn.textContent = "로그아웃 중...";
 
-  const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGOUT" });
+    const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGOUT" });
 
-  if (response.success) {
-    logoutBtn.disabled = false;
-    logoutBtn.textContent = "로그아웃";
-    showLoginView();
-  } else {
-    alert(`로그아웃 실패: ${response.error}`);
+    if (response.success) {
+      showLoginView();
+    } else {
+      alert(`로그아웃 실패: ${response.error}`);
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
     logoutBtn.disabled = false;
     logoutBtn.textContent = "로그아웃";
   }
