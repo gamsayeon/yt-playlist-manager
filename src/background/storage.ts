@@ -79,22 +79,33 @@ export async function removeFromTempList(videoId: string): Promise<void> {
 
 /** 임시 리스트 전체 초기화 */
 export async function clearTempList(): Promise<void> {
-  await removeStorage(STORAGE_KEYS.TEMP_LIST);
+  const operationPromise = tempListQueue.then(async () => {
+    await removeStorage(STORAGE_KEYS.TEMP_LIST);
+  });
+
+  tempListQueue = operationPromise.catch(() => {});
+  await operationPromise;
 }
 
 /** 캐시된 재생목록 조회 (5분 TTL) */
 export async function getCachedPlaylists(): Promise<Playlist[] | null> {
-  const cachedAt = await getStorage<number>(STORAGE_KEYS.CACHED_PLAYLISTS_AT);
+  const items = await chrome.storage.local.get([
+    STORAGE_KEYS.CACHED_PLAYLISTS_AT,
+    STORAGE_KEYS.CACHED_PLAYLISTS,
+  ]);
 
-  if (!cachedAt) return null;
+  const cachedAt = items[STORAGE_KEYS.CACHED_PLAYLISTS_AT];
+  const playlists = items[STORAGE_KEYS.CACHED_PLAYLISTS];
 
-  const isExpired = Date.now() - cachedAt > TTL_MS;
+  if (!cachedAt || !playlists) return null;
+
+  const isExpired = Date.now() - (cachedAt as number) > TTL_MS;
   if (isExpired) {
     await invalidatePlaylists();
     return null;
   }
 
-  return getStorage<Playlist[]>(STORAGE_KEYS.CACHED_PLAYLISTS);
+  return playlists as Playlist[];
 }
 
 /** 캐시된 재생목록 저장 */

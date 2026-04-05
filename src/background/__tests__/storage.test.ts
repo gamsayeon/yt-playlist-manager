@@ -8,6 +8,7 @@ import {
   invalidatePlaylists,
   VideoItem,
   Playlist,
+  STORAGE_KEYS,
 } from "../storage";
 
 const mockVideo1: VideoItem = {
@@ -45,7 +46,7 @@ describe("getTempList", () => {
 
   it("저장된 임시 리스트를 반환한다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      tempList: [mockVideo1],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1],
     });
 
     const result = await getTempList();
@@ -57,13 +58,13 @@ describe("addToTempList", () => {
   it("영상을 임시 리스트에 추가한다", async () => {
     await addToTempList(mockVideo1);
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      tempList: [mockVideo1],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1],
     });
   });
 
   it("중복 영상은 추가하지 않는다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      tempList: [mockVideo1],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1],
     });
 
     await addToTempList(mockVideo1);
@@ -72,12 +73,12 @@ describe("addToTempList", () => {
 
   it("서로 다른 영상을 순서대로 추가한다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      tempList: [mockVideo1],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1],
     });
 
     await addToTempList(mockVideo2);
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      tempList: [mockVideo1, mockVideo2],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1, mockVideo2],
     });
   });
 });
@@ -85,18 +86,18 @@ describe("addToTempList", () => {
 describe("removeFromTempList", () => {
   it("videoId에 해당하는 영상을 제거한다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      tempList: [mockVideo1, mockVideo2],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1, mockVideo2],
     });
 
     await removeFromTempList("video1");
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      tempList: [mockVideo2],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo2],
     });
   });
 
   it("존재하지 않는 videoId 제거 시 setStorage를 호출하지 않는다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      tempList: [mockVideo1],
+      [STORAGE_KEYS.TEMP_LIST]: [mockVideo1],
     });
 
     await removeFromTempList("nonexistent");
@@ -107,7 +108,9 @@ describe("removeFromTempList", () => {
 describe("clearTempList", () => {
   it("임시 리스트를 초기화한다", async () => {
     await clearTempList();
-    expect(chrome.storage.local.remove).toHaveBeenCalledWith("tempList");
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith(
+      STORAGE_KEYS.TEMP_LIST
+    );
   });
 });
 
@@ -129,9 +132,10 @@ describe("getCachedPlaylists", () => {
     const now = Date.now();
     jest.setSystemTime(now);
 
-    (chrome.storage.local.get as jest.Mock)
-      .mockResolvedValueOnce({ cachedPlaylistsAt: now })
-      .mockResolvedValueOnce({ cachedPlaylists: mockPlaylists });
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      [STORAGE_KEYS.CACHED_PLAYLISTS_AT]: now,
+      [STORAGE_KEYS.CACHED_PLAYLISTS]: mockPlaylists,
+    });
 
     const result = await getCachedPlaylists();
     expect(result).toEqual(mockPlaylists);
@@ -142,14 +146,15 @@ describe("getCachedPlaylists", () => {
     jest.setSystemTime(now + 6 * 60 * 1000);
 
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      cachedPlaylistsAt: now,
+      [STORAGE_KEYS.CACHED_PLAYLISTS_AT]: now,
+      [STORAGE_KEYS.CACHED_PLAYLISTS]: mockPlaylists,
     });
 
     const result = await getCachedPlaylists();
     expect(result).toBeNull();
     expect(chrome.storage.local.remove).toHaveBeenCalledWith([
-      "cachedPlaylists",
-      "cachedPlaylistsAt",
+      STORAGE_KEYS.CACHED_PLAYLISTS,
+      STORAGE_KEYS.CACHED_PLAYLISTS_AT,
     ]);
   });
 });
@@ -170,8 +175,8 @@ describe("setCachedPlaylists", () => {
     await setCachedPlaylists(mockPlaylists);
 
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      cachedPlaylists: mockPlaylists,
-      cachedPlaylistsAt: now,
+      [STORAGE_KEYS.CACHED_PLAYLISTS]: mockPlaylists,
+      [STORAGE_KEYS.CACHED_PLAYLISTS_AT]: now,
     });
   });
 });
@@ -180,8 +185,8 @@ describe("invalidatePlaylists", () => {
   it("캐시와 타임스탬프를 동시에 삭제한다", async () => {
     await invalidatePlaylists();
     expect(chrome.storage.local.remove).toHaveBeenCalledWith([
-      "cachedPlaylists",
-      "cachedPlaylistsAt",
+      STORAGE_KEYS.CACHED_PLAYLISTS,
+      STORAGE_KEYS.CACHED_PLAYLISTS_AT,
     ]);
   });
 });
