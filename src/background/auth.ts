@@ -14,11 +14,11 @@ export async function getAuthToken(interactive: boolean): Promise<string> {
 }
 
 /** Access Token 강제 갱신 */
-export async function refreshAuthToken(): Promise<string> {
-  const oldToken = await getAuthToken(false);
+export async function refreshAuthToken(expiredToken?: string): Promise<string> {
+  const tokenToRemove = expiredToken ?? (await getAuthToken(false));
 
   await new Promise<void>((resolve, reject) => {
-    chrome.identity.removeCachedAuthToken({ token: oldToken }, () => {
+    chrome.identity.removeCachedAuthToken({ token: tokenToRemove }, () => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError.message);
         return;
@@ -40,7 +40,7 @@ async function fetchUserId(token: string, isRetry = false): Promise<string> {
   );
 
   if (response.status === 401 && !isRetry) {
-    const newToken = await refreshAuthToken();
+    const newToken = await refreshAuthToken(token);
     return fetchUserId(newToken, true);
   }
 
