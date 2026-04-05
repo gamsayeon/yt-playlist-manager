@@ -49,6 +49,8 @@ logoutBtn.addEventListener("click", async () => {
   const response: MessageResponse = await chrome.runtime.sendMessage({ type: "LOGOUT" });
 
   if (response.success) {
+    logoutBtn.disabled = false;
+    logoutBtn.textContent = "로그아웃";
     showLoginView();
   } else {
     alert(`로그아웃 실패: ${response.error}`);
