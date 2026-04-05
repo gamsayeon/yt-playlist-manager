@@ -94,15 +94,13 @@ describe("removeFromTempList", () => {
     });
   });
 
-  it("존재하지 않는 videoId 제거 시 리스트 변화 없음", async () => {
+  it("존재하지 않는 videoId 제거 시 setStorage를 호출하지 않는다", async () => {
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
       tempList: [mockVideo1],
     });
 
     await removeFromTempList("nonexistent");
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      tempList: [mockVideo1],
-    });
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
   });
 });
 

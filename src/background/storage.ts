@@ -21,6 +21,9 @@ export interface Playlist {
 
 const TTL_MS = 5 * 60 * 1000; // 5분
 
+// 임시 리스트 작업 직렬화를 위한 Promise 체인
+let tempListQueue: Promise<void> = Promise.resolve();
+
 /** 단일 키 조회 */
 export async function getStorage<T>(key: StorageKey): Promise<T | null> {
   const result = await chrome.storage.local.get(key);
@@ -50,17 +53,25 @@ export async function getTempList(): Promise<VideoItem[]> {
 
 /** 임시 리스트에 영상 추가 */
 export async function addToTempList(video: VideoItem): Promise<void> {
-  const list = await getTempList();
-  const exists = list.some((item) => item.videoId === video.videoId);
-  if (exists) return;
-  await setStorage(STORAGE_KEYS.TEMP_LIST, [...list, video]);
+  tempListQueue = tempListQueue.then(async () => {
+    const list = await getTempList();
+    const exists = list.some((item) => item.videoId === video.videoId);
+    if (exists) return;
+    await setStorage(STORAGE_KEYS.TEMP_LIST, [...list, video]);
+  });
+  await tempListQueue;
 }
 
 /** 임시 리스트에서 영상 제거 */
 export async function removeFromTempList(videoId: string): Promise<void> {
-  const list = await getTempList();
-  const filtered = list.filter((item) => item.videoId !== videoId);
-  await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
+  tempListQueue = tempListQueue.then(async () => {
+    const list = await getTempList();
+    const filtered = list.filter((item) => item.videoId !== videoId);
+    if (list.length > filtered.length) {
+      await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
+    }
+  });
+  await tempListQueue;
 }
 
 /** 임시 리스트 전체 초기화 */
