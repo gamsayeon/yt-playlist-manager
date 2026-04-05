@@ -1,1 +1,10 @@
-console.log("[YT Playlist Manager] Content script loaded.");
+import { injectCheckboxes } from "./checkbox";
+import { onMutation } from "./observer";
+
+console.log("[YT Playlist Manager] content script loaded");
+
+injectCheckboxes();
+
+onMutation(() => {
+  injectCheckboxes();
+});
