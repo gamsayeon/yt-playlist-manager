@@ -21,7 +21,6 @@ export interface Playlist {
 
 const TTL_MS = 5 * 60 * 1000; // 5분
 
-// 임시 리스트 작업 직렬화를 위한 Promise 체인
 let tempListQueue: Promise<void> = Promise.resolve();
 
 /** 단일 키 조회 */
@@ -53,25 +52,29 @@ export async function getTempList(): Promise<VideoItem[]> {
 
 /** 임시 리스트에 영상 추가 */
 export async function addToTempList(video: VideoItem): Promise<void> {
-  tempListQueue = tempListQueue.then(async () => {
+  const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
     const exists = list.some((item) => item.videoId === video.videoId);
     if (exists) return;
     await setStorage(STORAGE_KEYS.TEMP_LIST, [...list, video]);
   });
-  await tempListQueue;
+
+  tempListQueue = operationPromise.catch(() => {});
+  await operationPromise;
 }
 
 /** 임시 리스트에서 영상 제거 */
 export async function removeFromTempList(videoId: string): Promise<void> {
-  tempListQueue = tempListQueue.then(async () => {
+  const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
     const filtered = list.filter((item) => item.videoId !== videoId);
     if (list.length > filtered.length) {
       await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
     }
   });
-  await tempListQueue;
+
+  tempListQueue = operationPromise.catch(() => {});
+  await operationPromise;
 }
 
 /** 임시 리스트 전체 초기화 */
@@ -86,7 +89,10 @@ export async function getCachedPlaylists(): Promise<Playlist[] | null> {
   if (!cachedAt) return null;
 
   const isExpired = Date.now() - cachedAt > TTL_MS;
-  if (isExpired) return null;
+  if (isExpired) {
+    await invalidatePlaylists();
+    return null;
+  }
 
   return getStorage<Playlist[]>(STORAGE_KEYS.CACHED_PLAYLISTS);
 }

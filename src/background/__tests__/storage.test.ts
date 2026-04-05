@@ -112,47 +112,67 @@ describe("clearTempList", () => {
 });
 
 describe("getCachedPlaylists", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("캐시가 없으면 null을 반환한다", async () => {
     const result = await getCachedPlaylists();
     expect(result).toBeNull();
   });
 
   it("TTL 이내의 캐시를 반환한다", async () => {
+    const now = Date.now();
+    jest.setSystemTime(now);
+
     (chrome.storage.local.get as jest.Mock)
-      .mockResolvedValueOnce({ cachedPlaylistsAt: Date.now() })
+      .mockResolvedValueOnce({ cachedPlaylistsAt: now })
       .mockResolvedValueOnce({ cachedPlaylists: mockPlaylists });
 
     const result = await getCachedPlaylists();
     expect(result).toEqual(mockPlaylists);
   });
 
-  it("TTL 만료 시 null을 반환한다", async () => {
-    const expiredTime = Date.now() - 6 * 60 * 1000;
+  it("TTL 만료 시 null을 반환하고 캐시를 삭제한다", async () => {
+    const now = Date.now();
+    jest.setSystemTime(now + 6 * 60 * 1000);
+
     (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      cachedPlaylistsAt: expiredTime,
+      cachedPlaylistsAt: now,
     });
 
     const result = await getCachedPlaylists();
     expect(result).toBeNull();
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith([
+      "cachedPlaylists",
+      "cachedPlaylistsAt",
+    ]);
   });
 });
 
 describe("setCachedPlaylists", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("재생목록과 타임스탬프를 저장한다", async () => {
-    const before = Date.now();
+    const now = Date.now();
+    jest.setSystemTime(now);
+
     await setCachedPlaylists(mockPlaylists);
-    const after = Date.now();
 
-    expect(chrome.storage.local.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cachedPlaylists: mockPlaylists,
-        cachedPlaylistsAt: expect.any(Number),
-      })
-    );
-
-    const call = (chrome.storage.local.set as jest.Mock).mock.calls[0][0];
-    expect(call.cachedPlaylistsAt).toBeGreaterThanOrEqual(before);
-    expect(call.cachedPlaylistsAt).toBeLessThanOrEqual(after);
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      cachedPlaylists: mockPlaylists,
+      cachedPlaylistsAt: now,
+    });
   });
 });
 
