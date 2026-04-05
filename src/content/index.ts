@@ -1,0 +1,1 @@
+console.log("[YT Playlist Manager] Content script loaded.");
