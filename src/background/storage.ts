@@ -7,6 +7,12 @@ const STORAGE_KEYS = {
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
+export interface VideoItem {
+  videoId: string;
+  title: string;
+  thumbnail: string;
+}
+
 /** 단일 키 조회 */
 export async function getStorage<T>(key: StorageKey): Promise<T | null> {
   const result = await chrome.storage.local.get(key);
@@ -26,6 +32,32 @@ export async function removeStorage(key: StorageKey): Promise<void> {
 /** 전체 스토리지 초기화 */
 export async function clearStorage(): Promise<void> {
   await chrome.storage.local.clear();
+}
+
+/** 임시 리스트 조회 */
+export async function getTempList(): Promise<VideoItem[]> {
+  const list = await getStorage<VideoItem[]>(STORAGE_KEYS.TEMP_LIST);
+  return list ?? [];
+}
+
+/** 임시 리스트에 영상 추가 */
+export async function addToTempList(video: VideoItem): Promise<void> {
+  const list = await getTempList();
+  const exists = list.some((item) => item.videoId === video.videoId);
+  if (exists) return;
+  await setStorage(STORAGE_KEYS.TEMP_LIST, [...list, video]);
+}
+
+/** 임시 리스트에서 영상 제거 */
+export async function removeFromTempList(videoId: string): Promise<void> {
+  const list = await getTempList();
+  const filtered = list.filter((item) => item.videoId !== videoId);
+  await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
+}
+
+/** 임시 리스트 전체 초기화 */
+export async function clearTempList(): Promise<void> {
+  await removeStorage(STORAGE_KEYS.TEMP_LIST);
 }
 
 export { STORAGE_KEYS };
