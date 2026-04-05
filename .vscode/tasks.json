@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Init: .env 파일 생성",
+      "type": "shell",
+      "command": "cp .env.example .env",
+      "windows": {
+        "command": "copy .env.example .env"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
