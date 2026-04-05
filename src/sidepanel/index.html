@@ -4,10 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YT Playlist Manager</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <h1>YT Playlist Manager</h1>
-    <p>Side Panel 초기화 완료</p>
+    <div id="app">
+      <div id="login-view">
+        <h1>YT Playlist Manager</h1>
+        <button id="login-btn">Google 계정으로 로그인</button>
+      </div>
+      <div id="main-view" class="hidden">
+        <h1>YT Playlist Manager</h1>
+        <p id="user-info"></p>
+        <button id="logout-btn">로그아웃</button>
+      </div>
+    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
