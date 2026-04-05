@@ -3,7 +3,7 @@ import webExtension from "vite-plugin-web-extension";
 import manifest from "./manifest.config";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
+  const env = loadEnv(mode, process.cwd());
 
   return {
     plugins: [
@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
         manifest: () => ({
           ...manifest,
           oauth2: {
+            ...manifest.oauth2,
             client_id: env.VITE_OAUTH_CLIENT_ID || "",
-            scopes: ["https://www.googleapis.com/auth/youtube"],
           },
         }),
       }),

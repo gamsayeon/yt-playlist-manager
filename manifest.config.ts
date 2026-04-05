@@ -1,15 +1,18 @@
 const manifest = {
   manifest_version: 3,
   name: "YT Playlist Manager",
-  version: "0.0.1",
-  description: "YouTube 영상을 체크박스로 선택해 재생목록을 일괄 관리하는 확장 프로그램",
+  version: "0.1.0",
+  description: "YouTube 영상을 체크박스로 다중 선택하여 재생목록을 일괄 관리합니다.",
 
-  permissions: ["storage", "identity", "sidePanel"],
+  permissions: ["identity", "storage", "sidePanel"],
 
-  host_permissions: ["https://www.youtube.com/*"],
+  host_permissions: [
+    "https://www.youtube.com/*",
+    "https://www.googleapis.com/*",
+  ],
 
   oauth2: {
-    client_id: process.env.VITE_OAUTH_CLIENT_ID || "",
+    client_id: "",
     scopes: ["https://www.googleapis.com/auth/youtube"],
   },
 
@@ -22,6 +25,7 @@ const manifest = {
     {
       matches: ["https://www.youtube.com/*"],
       js: ["src/content/index.ts"],
+      run_at: "document_idle",
     },
   ],
 
@@ -32,6 +36,6 @@ const manifest = {
   action: {
     default_title: "YT Playlist Manager",
   },
-};
+} as const;
 
 export default manifest;
