@@ -20,6 +20,11 @@ import { onMutation } from "./observer";
 
 console.log("[YT Playlist Manager] content script loaded");
 
+// 라이브 영상 여부 확인
+function isLiveItem(item: Element): boolean {
+  return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
+}
+
 function injectCheckboxes(): void {
   const path = location.pathname;
 
@@ -28,9 +33,10 @@ function injectCheckboxes(): void {
     return;
   }
 
-  // 홈/채널 피드 - 게임 섹션 제외
+  // 홈/채널 피드 - 게임 섹션 제외, 라이브 제외
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
+    if (isLiveItem(item)) return;
 
     const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
     if (isShorts) {
@@ -45,18 +51,21 @@ function injectCheckboxes(): void {
   // 채널 동영상 탭 - ytd-rich-grid-media 사용
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
+    if (isLiveItem(item)) return;
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
 
   // 채널 홈 - ytd-grid-video-renderer 사용
   document.querySelectorAll("ytd-grid-video-renderer").forEach((item) => {
+    if (isLiveItem(item)) return;
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
 
   // 검색 일반+쇼츠
   document.querySelectorAll("ytd-video-renderer").forEach((item) => {
+    if (isLiveItem(item)) return;
     const videoInfo = parseSearchVideoInfo(item);
     if (videoInfo) injectSearchCheckbox(item, videoInfo);
   });
@@ -67,9 +76,10 @@ function injectCheckboxes(): void {
     if (videoInfo) injectSearchShortsCheckbox(item, videoInfo);
   });
 
-  // /watch 추천 영상 - 게임 섹션 제외
+  // /watch 추천 영상 - 게임 섹션 제외, 라이브 제외
   document.querySelectorAll("yt-lockup-view-model").forEach((item) => {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
+    if (isLiveItem(item)) return;
     const videoInfo = parseWatchVideoInfo(item);
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
