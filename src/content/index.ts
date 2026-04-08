@@ -10,6 +10,8 @@ import {
   injectSearchShortsCheckbox,
   parseWatchVideoInfo,
   injectWatchCheckbox,
+  parseWatchShortsInfo,
+  injectWatchShortsCheckbox,
   parseChannelVideoInfo,
   injectChannelCheckbox,
   injectShortsPageCheckbox,
@@ -40,7 +42,7 @@ function injectCheckboxes(): void {
     }
   });
 
-  // 채널 동영상 탭 - ytd-rich-grid-media 사용
+  // 채널 동영상 탭
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
     const videoInfo = parseChannelVideoInfo(item);
@@ -64,6 +66,14 @@ function injectCheckboxes(): void {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
     const videoInfo = parseWatchVideoInfo(item);
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
+  });
+
+  // /watch 쇼츠 - ytd-reel-shelf-renderer 안의 쇼츠
+  document.querySelectorAll(
+    "ytd-reel-shelf-renderer ytm-shorts-lockup-view-model-v2"
+  ).forEach((item) => {
+    const videoInfo = parseWatchShortsInfo(item);
+    if (videoInfo) injectWatchShortsCheckbox(item, videoInfo);
   });
 }
 

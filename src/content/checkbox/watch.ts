@@ -1,5 +1,6 @@
+// src/content/checkbox/watch.ts
 // ✅ /watch 추천 영상 - 정상 동작
-// ⚠️ 재생 중인 영상 자체의 체크박스는 미구현
+// ✅ /watch 쇼츠 - 미리보기 없으므로 단순 삽입
 
 import type { VideoInfo } from "./types";
 import { injectInto } from "./utils";
@@ -31,4 +32,38 @@ export function injectWatchCheckbox(item: Element, videoInfo: VideoInfo): void {
   ) as HTMLElement | null;
   if (!anchor?.parentElement) return;
   injectInto(anchor.parentElement, videoInfo);
+}
+
+// /watch 페이지 쇼츠 파싱
+export function parseWatchShortsInfo(item: Element): VideoInfo | null {
+  const shortsLink = item.querySelector(
+    "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
+  ) as HTMLAnchorElement | null;
+  if (!shortsLink) return null;
+
+  const shortsIdMatch = shortsLink.href.match(/\/shorts\/([^?&]+)/);
+  if (!shortsIdMatch) return null;
+
+  const videoId = shortsIdMatch[1];
+  const title =
+    item.querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
+      ?.textContent?.trim() ?? "";
+  const imgEl = item.querySelector(
+    "div.ytThumbnailViewModelImage img"
+  ) as HTMLImageElement | null;
+  return {
+    videoId,
+    title,
+    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+  };
+}
+
+// /watch 페이지 쇼츠 체크박스 삽입 - 미리보기 없으므로 a 태그 안에 단순 삽입
+export function injectWatchShortsCheckbox(item: Element, videoInfo: VideoInfo): void {
+  const anchor = item.querySelector(
+    "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
+  ) as HTMLElement | null;
+  if (!anchor) return;
+  anchor.style.position = "relative";
+  injectInto(anchor, videoInfo);
 }
