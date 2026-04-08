@@ -18,14 +18,6 @@ import { onMutation } from "./observer";
 
 console.log("[YT Playlist Manager] content script loaded");
 
-// 헤더 높이 (체크박스가 헤더 아래에만 표시되도록)
-function getHeaderHeight(): number {
-  const header = document.querySelector(
-    "ytd-masthead, #masthead-container"
-  ) as HTMLElement | null;
-  return header?.getBoundingClientRect().bottom ?? 56;
-}
-
 function injectCheckboxes(): void {
   const path = location.pathname;
 
@@ -34,12 +26,9 @@ function injectCheckboxes(): void {
     return;
   }
 
-  // 홈/채널 피드
+  // 홈/채널 피드 - 게임 섹션 제외
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
-    // 인기 실시간 게임 섹션 제외
-    // has-rounded-box-art-thumbnail-style = 게임 섹션 식별자
-    const shelf = item.closest("ytd-rich-shelf-renderer");
-    if (shelf?.hasAttribute("has-rounded-box-art-thumbnail-style")) return;
+    if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
 
     const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
     if (isShorts) {
@@ -53,7 +42,6 @@ function injectCheckboxes(): void {
 
   // 채널 동영상 탭 - ytd-rich-grid-media 사용
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
-    // 쇼츠 제외 (채널 쇼츠 탭은 별도)
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
@@ -71,8 +59,9 @@ function injectCheckboxes(): void {
     if (videoInfo) injectSearchShortsCheckbox(item, videoInfo);
   });
 
-  // /watch 추천 영상
+  // /watch 추천 영상 - 게임 섹션 제외
   document.querySelectorAll("yt-lockup-view-model").forEach((item) => {
+    if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
     const videoInfo = parseWatchVideoInfo(item);
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
