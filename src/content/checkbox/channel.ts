@@ -1,10 +1,10 @@
-// ❌ 채널 페이지 - 미구현
+// src/content/checkbox/channel.ts
 
 import type { VideoInfo } from "./types";
 import { injectInto } from "./utils";
 
 export function parseChannelVideoInfo(item: Element): VideoInfo | null {
-  // ytd-grid-video-renderer 구조
+  // 채널 탭은 ytd-rich-grid-media 사용
   const thumbnailLink = item.querySelector(
     "ytd-thumbnail a#thumbnail"
   ) as HTMLAnchorElement | null;
@@ -15,8 +15,10 @@ export function parseChannelVideoInfo(item: Element): VideoInfo | null {
 
   const videoId = videoIdMatch[1];
   const title =
-    item.querySelector("#video-title")?.textContent?.trim() ?? "";
-  const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
+    item.querySelector("#video-title, #title")?.textContent?.trim() ?? "";
+  const imgEl = item.querySelector(
+    "ytd-thumbnail img, yt-image img"
+  ) as HTMLImageElement | null;
   return {
     videoId,
     title,

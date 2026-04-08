@@ -2,7 +2,6 @@
 
 import type { VideoInfo } from "./types";
 
-// WeakMap → Map으로 변경 (clear() 가능)
 const itemCheckboxMap = new Map<Element, HTMLElement>();
 const clipObservers = new WeakMap<Element, MutationObserver>();
 const itemObservers = new WeakMap<Element, MutationObserver>();
@@ -67,19 +66,37 @@ function createFixedCheckbox(videoInfo: VideoInfo): HTMLElement {
   return wrapper;
 }
 
+function getHeaderBottom(): number {
+  const header = document.querySelector(
+    "ytd-masthead, #masthead-container"
+  ) as HTMLElement | null;
+  return header?.getBoundingClientRect().bottom ?? 56;
+}
+
 function updateCheckboxPosition(item: Element, cb: HTMLElement): void {
   const rect = item.getBoundingClientRect();
+  const headerBottom = getHeaderBottom();
+
   if (
     rect.width === 0 ||
     rect.height === 0 ||
-    rect.bottom < 0 ||
+    rect.bottom < headerBottom ||
     rect.top > window.innerHeight
   ) {
     cb.style.display = "none";
     return;
   }
+
+  const top = Math.max(rect.top + 8, headerBottom + 4);
+
+  // 체크박스가 item 썸네일 영역 밖으로 나가면 숨김
+  if (top > rect.bottom - 12) {
+    cb.style.display = "none";
+    return;
+  }
+
   cb.style.display = "block";
-  cb.style.top = rect.top + 8 + "px";
+  cb.style.top = top + "px";
   cb.style.left = rect.left + 8 + "px";
 }
 
@@ -152,14 +169,12 @@ function registerEvents(): void {
   if (eventsRegistered) return;
   eventsRegistered = true;
 
-  // capture: true로 YouTube 내부 스크롤도 캡처
   document.addEventListener("scroll", updateAllPositions, {
     passive: true,
     capture: true,
   });
   window.addEventListener("resize", updateAllPositions, { passive: true });
 
-  // YouTube 내부 스크롤 컨테이너
   const ytApp = document.querySelector("ytd-app");
   if (ytApp) {
     ytApp.addEventListener("scroll", updateAllPositions, { passive: true });
@@ -216,7 +231,6 @@ export function injectHomeShortsCheckbox(
 }
 
 export function removeHomeShortsCheckboxes(): void {
-  // 모든 체크박스 제거
   itemCheckboxMap.forEach((cb) => cb.remove());
   itemCheckboxMap.clear();
 
