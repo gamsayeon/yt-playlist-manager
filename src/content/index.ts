@@ -42,9 +42,15 @@ function injectCheckboxes(): void {
     }
   });
 
-  // 채널 동영상 탭
+  // 채널 동영상 탭 - ytd-rich-grid-media 사용
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
+    const videoInfo = parseChannelVideoInfo(item);
+    if (videoInfo) injectChannelCheckbox(item, videoInfo);
+  });
+
+  // 채널 홈 - ytd-grid-video-renderer 사용
+  document.querySelectorAll("ytd-grid-video-renderer").forEach((item) => {
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
@@ -68,7 +74,7 @@ function injectCheckboxes(): void {
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
 
-  // /watch 쇼츠 - ytd-reel-shelf-renderer 안의 쇼츠
+  // /watch 쇼츠
   document.querySelectorAll(
     "ytd-reel-shelf-renderer ytm-shorts-lockup-view-model-v2"
   ).forEach((item) => {
