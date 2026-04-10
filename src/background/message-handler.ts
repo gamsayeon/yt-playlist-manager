@@ -8,7 +8,7 @@ import {
   setCachedPlaylists,
   Playlist,
 } from "./storage";
-import { getPlaylists } from "./youtube-api";
+import { getPlaylists, createPlaylist } from "./youtube-api";
 
 export function registerMessageHandler(): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -55,14 +55,11 @@ export function registerMessageHandler(): void {
       case "GET_PLAYLISTS":
         (async () => {
           try {
-            // 캐시 우선 반환
             const cached = await getCachedPlaylists();
             if (cached) {
               sendResponse({ success: true, playlists: cached });
               return;
             }
-
-            // 캐시 만료 시 API 호출
             const playlists: Playlist[] = await getPlaylists();
             await setCachedPlaylists(playlists);
             sendResponse({ success: true, playlists });
@@ -74,6 +71,35 @@ export function registerMessageHandler(): void {
           }
         })();
         return true;
+
+      case "CREATE_PLAYLIST": {
+        const title = message.payload?.title;
+        if (!title) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        (async () => {
+          try {
+            // API 호출로 재생목록 생성
+            const playlist = await createPlaylist(title);
+
+            // tempList 초기화
+            await clearTempList();
+
+            // 캐시 갱신
+            const playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+
+            sendResponse({ success: true, playlist });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
+        return true;
+      }
 
       default:
         return false;
