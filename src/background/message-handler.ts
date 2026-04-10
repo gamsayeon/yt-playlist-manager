@@ -16,8 +16,18 @@ import {
   removeItemFromPlaylist,
 } from "./youtube-api";
 
+function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
+  return sender.id === chrome.runtime.id;
+}
+
 export function registerMessageHandler(): void {
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // 외부 sender 차단
+    if (!isInternalSender(sender)) {
+      sendResponse({ success: false, error: "Unauthorized sender" });
+      return false;
+    }
+
     switch (message.type) {
       case "ADD_TO_TEMP_LIST": {
         const videoId = (message.payload as VideoItem)?.videoId;
