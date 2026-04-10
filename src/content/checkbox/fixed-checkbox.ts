@@ -1,5 +1,3 @@
-// src/content/checkbox/fixed-checkbox.ts
-
 import type { VideoInfo } from "./types";
 
 export const itemCheckboxMap = new Map<Element, HTMLElement>();
@@ -102,14 +100,11 @@ export function updateCheckboxPosition(
 }
 
 export function updateAllPositions(): void {
-  // requestAnimationFrame으로 스크롤 이벤트 배치 처리
-  // getBoundingClientRect 호출을 프레임당 한 번으로 제한
   if (rafScheduled) return;
   rafScheduled = true;
 
   requestAnimationFrame(() => {
     rafScheduled = false;
-    // 루프 시작 시 헤더 높이 한 번만 계산
     const headerBottom = getHeaderBottom();
 
     itemCheckboxMap.forEach((cb, item) => {
@@ -142,8 +137,14 @@ export function registerFixedEvents(): void {
 export function injectFixedCheckbox(item: Element, videoInfo: VideoInfo): void {
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
-    updateCheckboxPosition(item, existing, getHeaderBottom());
-    return;
+    // SPA 특성상 동일 DOM 요소가 다른 영상에 재사용될 수 있으므로 videoId 비교
+    if (existing.dataset.videoId !== videoInfo.videoId) {
+      existing.remove();
+      itemCheckboxMap.delete(item);
+    } else {
+      updateCheckboxPosition(item, existing, getHeaderBottom());
+      return;
+    }
   }
 
   registerFixedEvents();

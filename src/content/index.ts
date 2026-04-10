@@ -15,6 +15,7 @@ import {
   parseChannelVideoInfo,
   injectChannelCheckbox,
   injectShortsPageCheckbox,
+  removeCheckboxes,
 } from "./checkbox";
 import { onMutation } from "./observer";
 
@@ -32,7 +33,6 @@ function injectCheckboxes(): void {
     return;
   }
 
-  // 홈/채널 피드 - 게임 섹션 제외, 라이브 제외
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
     if (isLiveItem(item)) return;
@@ -47,7 +47,6 @@ function injectCheckboxes(): void {
     }
   });
 
-  // 채널 동영상 탭
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
     if (isLiveItem(item)) return;
@@ -55,27 +54,23 @@ function injectCheckboxes(): void {
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
 
-  // 채널 홈
   document.querySelectorAll("ytd-grid-video-renderer").forEach((item) => {
     if (isLiveItem(item)) return;
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
 
-  // 검색 일반+쇼츠
   document.querySelectorAll("ytd-video-renderer").forEach((item) => {
     if (isLiveItem(item)) return;
     const videoInfo = parseSearchVideoInfo(item);
     if (videoInfo) injectSearchCheckbox(item, videoInfo);
   });
 
-  // 검색 쇼츠 그리드
   document.querySelectorAll(".ytGridShelfViewModelGridShelfItem").forEach((item) => {
     const videoInfo = parseSearchShortsInfo(item);
     if (videoInfo) injectSearchShortsCheckbox(item, videoInfo);
   });
 
-  // /watch 추천 영상 - 게임 섹션 제외, 라이브 제외
   document.querySelectorAll("yt-lockup-view-model").forEach((item) => {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
     if (isLiveItem(item)) return;
@@ -83,7 +78,6 @@ function injectCheckboxes(): void {
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
 
-  // /watch 쇼츠
   document.querySelectorAll(
     "ytd-reel-shelf-renderer ytm-shorts-lockup-view-model-v2"
   ).forEach((item) => {
@@ -95,20 +89,9 @@ function injectCheckboxes(): void {
 injectCheckboxes();
 onMutation(() => injectCheckboxes());
 
-// setTimeout 대신 yt-navigate-finish 이벤트 사용
-// YouTube SPA 네비게이션 완료 후 안정적으로 체크박스 삽입
+// yt-navigate-finish 이벤트로 SPA 네비게이션 감지
 document.addEventListener("yt-navigate-finish", () => {
   removeHomeShortsCheckboxes();
+  removeCheckboxes();
   injectCheckboxes();
 });
-
-// fallback: yt-navigate-finish가 발생하지 않는 경우를 위한 URL 감시
-let lastPath = location.pathname;
-const urlObserver = new MutationObserver(() => {
-  if (location.pathname !== lastPath) {
-    lastPath = location.pathname;
-    removeHomeShortsCheckboxes();
-    injectCheckboxes();
-  }
-});
-urlObserver.observe(document.body, { childList: true, subtree: true });

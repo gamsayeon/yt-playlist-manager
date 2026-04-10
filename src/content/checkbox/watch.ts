@@ -1,13 +1,12 @@
-// src/content/checkbox/watch.ts
-// ✅ /watch 추천 영상 - 정상 동작
-// ✅ /watch 쇼츠 - 미리보기 없으므로 단순 삽입
+// ✅ /watch 추천 영상
+// ✅ /watch 쇼츠
 
 import type { VideoInfo } from "./types";
 import { injectInto } from "./utils";
 
 export function parseWatchVideoInfo(item: Element): VideoInfo | null {
   const videoLink = item.querySelector(
-    "a.yt-lockup-view-model__content-image"
+    "a.yt-lockup-view-model__content-image, a.ytLockupViewModelContentImage"
   ) as HTMLAnchorElement | null;
   if (!videoLink) return null;
 
@@ -16,8 +15,9 @@ export function parseWatchVideoInfo(item: Element): VideoInfo | null {
 
   const videoId = videoIdMatch[1];
   const title =
-    item.querySelector("h3.yt-lockup-metadata-view-model__heading-reset a span")
-      ?.textContent?.trim() ?? "";
+    item.querySelector(
+      "h3.yt-lockup-metadata-view-model__heading-reset a span, h3.ytLockupMetadataViewModelHeadingReset a span"
+    )?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
   return {
     videoId,
@@ -28,13 +28,12 @@ export function parseWatchVideoInfo(item: Element): VideoInfo | null {
 
 export function injectWatchCheckbox(item: Element, videoInfo: VideoInfo): void {
   const anchor = item.querySelector(
-    "a.yt-lockup-view-model__content-image"
+    "a.yt-lockup-view-model__content-image, a.ytLockupViewModelContentImage"
   ) as HTMLElement | null;
   if (!anchor?.parentElement) return;
   injectInto(anchor.parentElement, videoInfo);
 }
 
-// /watch 페이지 쇼츠 파싱
 export function parseWatchShortsInfo(item: Element): VideoInfo | null {
   const shortsLink = item.querySelector(
     "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
@@ -58,7 +57,6 @@ export function parseWatchShortsInfo(item: Element): VideoInfo | null {
   };
 }
 
-// /watch 페이지 쇼츠 체크박스 삽입 - 미리보기 없으므로 a 태그 안에 단순 삽입
 export function injectWatchShortsCheckbox(item: Element, videoInfo: VideoInfo): void {
   const anchor = item.querySelector(
     "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
