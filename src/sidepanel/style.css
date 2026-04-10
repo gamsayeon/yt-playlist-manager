@@ -58,6 +58,19 @@ button {
   padding: 24px 0;
 }
 
+.temp-list-clear-btn {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #ff4444;
+  color: white;
+  font-size: 13px;
+}
+
+.temp-list-clear-btn:hover {
+  background-color: #cc0000;
+}
+
 .video-card {
   display: flex;
   align-items: center;

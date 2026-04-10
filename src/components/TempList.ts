@@ -15,16 +15,33 @@ export class TempList {
       return;
     }
 
+    const clearBtn = this.createClearButton();
+    this.container.appendChild(clearBtn);
+
     list.forEach((video) => {
       this.container.appendChild(this.createVideoCard(video));
     });
   }
 
   private createEmptyState(): HTMLElement {
-    const empty = document.createElement("p");
+    const empty = document.createElement("div");
     empty.className = "temp-list-empty";
-    empty.textContent = "선택된 영상이 없습니다.";
+
+    const message = document.createElement("p");
+    message.textContent = "선택된 영상이 없습니다.";
+
+    empty.appendChild(message);
     return empty;
+  }
+
+  private createClearButton(): HTMLElement {
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "temp-list-clear-btn";
+    clearBtn.textContent = "전체 초기화";
+    clearBtn.addEventListener("click", () => {
+      this.onClear();
+    });
+    return clearBtn;
   }
 
   private createVideoCard(video: VideoItem): HTMLElement {
@@ -32,7 +49,6 @@ export class TempList {
     card.className = "video-card";
     card.dataset.videoId = video.videoId;
 
-    // 썸네일
     const thumbnail = document.createElement("img");
     thumbnail.className = "video-thumbnail";
     thumbnail.src = video.thumbnail;
@@ -43,13 +59,11 @@ export class TempList {
       thumbnail.classList.add("video-thumbnail--error");
     });
 
-    // 제목
     const title = document.createElement("p");
     title.className = "video-title";
     title.textContent = video.title;
     title.title = video.title;
 
-    // 제거 버튼
     const removeBtn = document.createElement("button");
     removeBtn.className = "video-remove-btn";
     removeBtn.textContent = "✕";
@@ -77,6 +91,14 @@ export class TempList {
       });
     } catch (error) {
       console.error("[YT Playlist Manager] 제거 실패:", error);
+    }
+  }
+
+  private async onClear(): Promise<void> {
+    try {
+      await chrome.runtime.sendMessage({ type: "CLEAR_TEMP_LIST" });
+    } catch (error) {
+      console.error("[YT Playlist Manager] 초기화 실패:", error);
     }
   }
 }
