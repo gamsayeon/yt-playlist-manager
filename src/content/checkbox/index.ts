@@ -2,7 +2,12 @@ export type { VideoInfo } from "./types";
 
 // ✅ 정상 동작
 export { parseHomeVideoInfo, injectHomeVideoCheckbox } from "./home-video";
-export { parseWatchVideoInfo, injectWatchCheckbox, parseWatchShortsInfo, injectWatchShortsCheckbox } from "./watch";
+export {
+  parseWatchVideoInfo,
+  injectWatchCheckbox,
+  parseWatchShortsInfo,
+  injectWatchShortsCheckbox,
+} from "./watch";
 export {
   parseSearchVideoInfo,
   parseSearchShortsInfo,

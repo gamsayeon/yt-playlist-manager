@@ -1,115 +1,15 @@
 // src/content/checkbox/home-shorts.ts
 
 import type { VideoInfo } from "./types";
+import {
+  itemCheckboxMap,
+  injectFixedCheckbox,
+  updateCheckboxPosition,
+  removeAllFixedCheckboxes,
+} from "./fixed-checkbox";
 
-const itemCheckboxMap = new Map<Element, HTMLElement>();
 const clipObservers = new WeakMap<Element, MutationObserver>();
 const itemObservers = new WeakMap<Element, MutationObserver>();
-
-let fixedContainer: HTMLElement | null = null;
-
-function getFixedContainer(): HTMLElement {
-  if (!fixedContainer) {
-    fixedContainer = document.createElement("div");
-    fixedContainer.setAttribute("data-ytpm-fixed-container", "true");
-    fixedContainer.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 0;
-      height: 0;
-      overflow: visible;
-      z-index: 2147483647;
-      pointer-events: none;
-    `;
-    document.body.appendChild(fixedContainer);
-  }
-  return fixedContainer;
-}
-
-function createFixedCheckbox(videoInfo: VideoInfo): HTMLElement {
-  const wrapper = document.createElement("div");
-  wrapper.setAttribute("data-ytpm-checkbox", "true");
-  wrapper.dataset.videoId = videoInfo.videoId;
-  wrapper.style.cssText = `
-    position: fixed;
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    isolation: isolate;
-    pointer-events: auto;
-    z-index: 2147483647;
-  `;
-
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.style.cssText = `
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-    accent-color: #ff0000;
-  `;
-
-  input.addEventListener("click", (e) => e.stopPropagation());
-  input.addEventListener("change", (e) => {
-    e.stopPropagation();
-    const messageType = input.checked ? "ADD_TO_TEMP_LIST" : "REMOVE_FROM_TEMP_LIST";
-    chrome.runtime.sendMessage({ type: messageType, payload: videoInfo }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("[YT Playlist Manager] sendMessage error", chrome.runtime.lastError);
-      }
-    });
-    wrapper.dataset.checked = String(input.checked);
-  });
-
-  wrapper.appendChild(input);
-  return wrapper;
-}
-
-function getHeaderBottom(): number {
-  const header = document.querySelector(
-    "ytd-masthead, #masthead-container"
-  ) as HTMLElement | null;
-  return header?.getBoundingClientRect().bottom ?? 56;
-}
-
-function updateCheckboxPosition(item: Element, cb: HTMLElement): void {
-  const rect = item.getBoundingClientRect();
-  const headerBottom = getHeaderBottom();
-
-  if (
-    rect.width === 0 ||
-    rect.height === 0 ||
-    rect.bottom < headerBottom ||
-    rect.top > window.innerHeight
-  ) {
-    cb.style.display = "none";
-    return;
-  }
-
-  const top = Math.max(rect.top + 8, headerBottom + 4);
-
-  // 체크박스가 item 썸네일 영역 밖으로 나가면 숨김
-  if (top > rect.bottom - 12) {
-    cb.style.display = "none";
-    return;
-  }
-
-  cb.style.display = "block";
-  cb.style.top = top + "px";
-  cb.style.left = rect.left + 8 + "px";
-}
-
-function updateAllPositions(): void {
-  itemCheckboxMap.forEach((cb, item) => {
-    if (document.contains(item)) {
-      updateCheckboxPosition(item, cb);
-    } else {
-      cb.remove();
-      itemCheckboxMap.delete(item);
-    }
-  });
-}
 
 function keepClipPathNone(contents: HTMLElement): void {
   if (clipObservers.has(contents)) return;
@@ -163,24 +63,6 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
   itemObservers.set(item, obs);
 }
 
-let eventsRegistered = false;
-
-function registerEvents(): void {
-  if (eventsRegistered) return;
-  eventsRegistered = true;
-
-  document.addEventListener("scroll", updateAllPositions, {
-    passive: true,
-    capture: true,
-  });
-  window.addEventListener("resize", updateAllPositions, { passive: true });
-
-  const ytApp = document.querySelector("ytd-app");
-  if (ytApp) {
-    ytApp.addEventListener("scroll", updateAllPositions, { passive: true });
-  }
-}
-
 export function parseHomeShortsInfo(item: Element): VideoInfo | null {
   const shortsLink = item.querySelector(
     "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
@@ -209,40 +91,20 @@ export function injectHomeShortsCheckbox(
   item: Element,
   videoInfo: VideoInfo
 ): void {
-  if (itemCheckboxMap.has(item)) {
-    const existing = itemCheckboxMap.get(item)!;
-    updateCheckboxPosition(item, existing);
-    return;
-  }
-
   const contents = item.closest("#contents") as HTMLElement | null;
   if (contents) {
     keepClipPathNone(contents);
   }
 
-  registerEvents();
+  const cb = itemCheckboxMap.get(item);
+  injectFixedCheckbox(item, videoInfo);
 
-  const cb = createFixedCheckbox(videoInfo);
-  getFixedContainer().appendChild(cb);
-  itemCheckboxMap.set(item, cb);
-
-  updateCheckboxPosition(item, cb);
-  watchItemContent(item, cb);
+  if (!cb) {
+    const newCb = itemCheckboxMap.get(item)!;
+    watchItemContent(item, newCb);
+  }
 }
 
 export function removeHomeShortsCheckboxes(): void {
-  itemCheckboxMap.forEach((cb) => cb.remove());
-  itemCheckboxMap.clear();
-
-  fixedContainer?.remove();
-  fixedContainer = null;
-  eventsRegistered = false;
-
-  document.removeEventListener("scroll", updateAllPositions, true);
-  window.removeEventListener("resize", updateAllPositions);
-
-  const ytApp = document.querySelector("ytd-app");
-  if (ytApp) {
-    ytApp.removeEventListener("scroll", updateAllPositions);
-  }
+  removeAllFixedCheckboxes();
 }

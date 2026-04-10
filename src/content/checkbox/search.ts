@@ -1,8 +1,7 @@
-// ✅ 검색 일반 영상 - 정상 동작
-// ⚠️ 검색 쇼츠 - 미리보기 재생 시 사라짐 미해결
+// src/content/checkbox/search.ts
 
 import type { VideoInfo } from "./types";
-import { injectInto } from "./utils";
+import { injectFixedCheckbox } from "./fixed-checkbox";
 
 export function parseSearchVideoInfo(item: Element): VideoInfo | null {
   const thumbnailLink = item.querySelector("a#thumbnail") as HTMLAnchorElement | null;
@@ -61,9 +60,9 @@ export function parseSearchShortsInfo(item: Element): VideoInfo | null {
 export function injectSearchCheckbox(item: Element, videoInfo: VideoInfo): void {
   const anchor = item.querySelector("ytd-thumbnail") as HTMLElement | null;
   if (!anchor) return;
-  injectInto(anchor, videoInfo);
+  injectFixedCheckbox(anchor, videoInfo);
 }
 
 export function injectSearchShortsCheckbox(item: Element, videoInfo: VideoInfo): void {
-  injectInto(item as HTMLElement, videoInfo);
+  injectFixedCheckbox(item as HTMLElement, videoInfo);
 }
