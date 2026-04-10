@@ -60,6 +60,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
       showLoginView();
     }
   }
+
+  // Content Script에서 체크/해제 시 실시간 갱신
+  if ("tempList" in changes) {
+    const list = (changes.tempList.newValue as VideoItem[]) ?? [];
+    tempList.render(list);
+  }
 });
 
 loginBtn.addEventListener("click", async () => {
