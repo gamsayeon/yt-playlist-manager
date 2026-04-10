@@ -1,5 +1,7 @@
 import { VideoItem } from "../types";
 
+export type { VideoItem };
+
 const STORAGE_KEYS = {
   TEMP_LIST: "tempList",
   CACHED_PLAYLISTS: "cachedPlaylists",
@@ -8,6 +10,7 @@ const STORAGE_KEYS = {
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
+
 export interface Playlist {
   id: string;
   title: string;
