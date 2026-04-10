@@ -1,46 +1,45 @@
-import { login, logout } from "./auth";
-import { addToTempList, removeFromTempList, VideoItem } from "./storage";
-import { Message } from "../types/message";
+import { VideoItem } from "../types";
 
-console.log("[YT Playlist Manager] service worker loaded");
+const tempList: VideoItem[] = [];
 
-chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
-  if (message.type === "LOGIN" || message.type === "LOGOUT") {
-    (async () => {
-      try {
-        if (message.type === "LOGIN") {
-          const userId = await login();
-          sendResponse({ success: true, userId });
-        } else {
-          await logout();
-          sendResponse({ success: true });
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        sendResponse({ success: false, error: errorMsg });
-      }
-    })();
-    return true;
-  }
-
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "ADD_TO_TEMP_LIST") {
-    addToTempList(message.payload as VideoItem)
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        sendResponse({ success: false, error: errorMsg });
-      });
+    const videoId = (message.payload as VideoItem)?.videoId;
+    if (!videoId) {
+      sendResponse({ success: false, error: "Invalid payload" });
+      return true;
+    }
+    const payload = message.payload as VideoItem;
+    const exists = tempList.some((item) => item.videoId === payload.videoId);
+    if (!exists) {
+      tempList.push(payload);
+    }
+    sendResponse({ success: true, list: tempList });
     return true;
   }
 
   if (message.type === "REMOVE_FROM_TEMP_LIST") {
-    const videoId = (message.payload as VideoItem).videoId;
-    removeFromTempList(videoId)
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        sendResponse({ success: false, error: errorMsg });
-      });
+    const videoId = (message.payload as VideoItem)?.videoId;
+    if (!videoId) {
+      sendResponse({ success: false, error: "Invalid payload" });
+      return true;
+    }
+    const index = tempList.findIndex((item) => item.videoId === videoId);
+    if (index !== -1) {
+      tempList.splice(index, 1);
+    }
+    sendResponse({ success: true, list: tempList });
+    return true;
+  }
+
+  if (message.type === "GET_TEMP_LIST") {
+    sendResponse({ success: true, list: tempList });
+    return true;
+  }
+
+  if (message.type === "CLEAR_TEMP_LIST") {
+    tempList.length = 0;
+    sendResponse({ success: true, list: tempList });
     return true;
   }
 

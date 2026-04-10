@@ -1,5 +1,1 @@
-export interface VideoInfo {
-  videoId: string;
-  title: string;
-  thumbnail: string;
-}
+export type { VideoInfo, VideoItem } from "../../types";

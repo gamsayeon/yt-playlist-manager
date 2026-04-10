@@ -44,12 +44,15 @@ export function createCheckbox(videoInfo: VideoInfo): HTMLElement {
 export function injectInto(anchor: HTMLElement, videoInfo: VideoInfo): void {
   const existing = anchor.querySelector("[data-ytpm-checkbox]") as HTMLElement | null;
   if (existing) {
-    // SPA 특성상 동일 DOM 요소가 다른 영상에 재사용될 수 있으므로 videoId 비교
     if (existing.dataset.videoId === videoInfo.videoId) return;
     existing.remove();
   }
 
-  anchor.style.position = "relative";
+  // static인 경우에만 relative로 변경 (YouTube 레이아웃 충돌 방지)
+  if (window.getComputedStyle(anchor).position === "static") {
+    anchor.style.position = "relative";
+  }
+
   anchor.appendChild(createCheckbox(videoInfo));
 }
 
