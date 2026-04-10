@@ -1,0 +1,26 @@
+const OBSERVER_THROTTLE_MS = 300;
+
+let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onMutation(callback: () => void): MutationObserver {
+  const observer = new MutationObserver(() => {
+    if (throttleTimer) return;
+
+    throttleTimer = setTimeout(() => {
+      throttleTimer = null;
+      callback();
+    }, OBSERVER_THROTTLE_MS);
+  });
+
+  // #content로 범위 제한, 없으면 document.body로 fallback
+  const target = document.querySelector("#content, #contents, ytd-app") ?? document.body;
+
+  observer.observe(target, {
+    childList: true,
+    subtree: true,
+  });
+
+  return observer;
+}
+
+export { onMutation };
