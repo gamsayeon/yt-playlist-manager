@@ -4,7 +4,11 @@ import {
   addToTempList,
   removeFromTempList,
   clearTempList,
+  getCachedPlaylists,
+  setCachedPlaylists,
+  Playlist,
 } from "./storage";
+import { getPlaylists } from "./youtube-api";
 
 export function registerMessageHandler(): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -46,6 +50,29 @@ export function registerMessageHandler(): void {
           const list = await getTempList();
           sendResponse({ success: true, list });
         });
+        return true;
+
+      case "GET_PLAYLISTS":
+        (async () => {
+          try {
+            // 캐시 우선 반환
+            const cached = await getCachedPlaylists();
+            if (cached) {
+              sendResponse({ success: true, playlists: cached });
+              return;
+            }
+
+            // 캐시 만료 시 API 호출
+            const playlists: Playlist[] = await getPlaylists();
+            await setCachedPlaylists(playlists);
+            sendResponse({ success: true, playlists });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
         return true;
 
       default:
