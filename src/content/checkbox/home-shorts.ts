@@ -6,6 +6,8 @@ import {
   injectFixedCheckbox,
   updateCheckboxPosition,
   removeAllFixedCheckboxes,
+  getFixedContainer,
+  createFixedCheckbox,
 } from "./fixed-checkbox";
 
 const clipObservers = new WeakMap<Element, MutationObserver>();
@@ -53,7 +55,10 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
         injectHomeShortsCheckbox(item, videoInfo);
       }
     } else {
-      updateCheckboxPosition(item, cb);
+      const headerBottom =
+        (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
+          ?.getBoundingClientRect().bottom ?? 56;
+      updateCheckboxPosition(item, cb, headerBottom);
     }
 
     obs.observe(item, { childList: true, subtree: true });
@@ -96,13 +101,25 @@ export function injectHomeShortsCheckbox(
     keepClipPathNone(contents);
   }
 
-  const cb = itemCheckboxMap.get(item);
-  injectFixedCheckbox(item, videoInfo);
-
-  if (!cb) {
-    const newCb = itemCheckboxMap.get(item)!;
-    watchItemContent(item, newCb);
+  if (itemCheckboxMap.has(item)) {
+    const existing = itemCheckboxMap.get(item)!;
+    const headerBottom =
+      (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
+        ?.getBoundingClientRect().bottom ?? 56;
+    updateCheckboxPosition(item, existing, headerBottom);
+    return;
   }
+
+  const cb = createFixedCheckbox(videoInfo);
+  getFixedContainer().appendChild(cb);
+  itemCheckboxMap.set(item, cb);
+
+  const headerBottom =
+    (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
+      ?.getBoundingClientRect().bottom ?? 56;
+  updateCheckboxPosition(item, cb, headerBottom);
+
+  watchItemContent(item, cb);
 }
 
 export function removeHomeShortsCheckboxes(): void {

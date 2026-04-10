@@ -12,7 +12,10 @@ function onMutation(callback: () => void): MutationObserver {
     }, OBSERVER_THROTTLE_MS);
   });
 
-  observer.observe(document.body, {
+  // #content로 범위 제한, 없으면 document.body로 fallback
+  const target = document.querySelector("#content, #contents, ytd-app") ?? document.body;
+
+  observer.observe(target, {
     childList: true,
     subtree: true,
   });

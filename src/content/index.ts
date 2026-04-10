@@ -20,7 +20,6 @@ import { onMutation } from "./observer";
 
 console.log("[YT Playlist Manager] content script loaded");
 
-// 라이브 영상 여부 확인
 function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
@@ -48,7 +47,7 @@ function injectCheckboxes(): void {
     }
   });
 
-  // 채널 동영상 탭 - ytd-rich-grid-media 사용
+  // 채널 동영상 탭
   document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
     if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
     if (isLiveItem(item)) return;
@@ -56,7 +55,7 @@ function injectCheckboxes(): void {
     if (videoInfo) injectChannelCheckbox(item, videoInfo);
   });
 
-  // 채널 홈 - ytd-grid-video-renderer 사용
+  // 채널 홈
   document.querySelectorAll("ytd-grid-video-renderer").forEach((item) => {
     if (isLiveItem(item)) return;
     const videoInfo = parseChannelVideoInfo(item);
@@ -94,19 +93,22 @@ function injectCheckboxes(): void {
 }
 
 injectCheckboxes();
+onMutation(() => injectCheckboxes());
 
-onMutation(() => {
+// setTimeout 대신 yt-navigate-finish 이벤트 사용
+// YouTube SPA 네비게이션 완료 후 안정적으로 체크박스 삽입
+document.addEventListener("yt-navigate-finish", () => {
+  removeHomeShortsCheckboxes();
   injectCheckboxes();
 });
 
+// fallback: yt-navigate-finish가 발생하지 않는 경우를 위한 URL 감시
 let lastPath = location.pathname;
-
 const urlObserver = new MutationObserver(() => {
   if (location.pathname !== lastPath) {
     lastPath = location.pathname;
     removeHomeShortsCheckboxes();
-    setTimeout(() => injectCheckboxes(), 500);
+    injectCheckboxes();
   }
 });
-
 urlObserver.observe(document.body, { childList: true, subtree: true });

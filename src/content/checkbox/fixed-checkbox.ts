@@ -1,5 +1,4 @@
 // src/content/checkbox/fixed-checkbox.ts
-// fixed 방식 체크박스 공통 모듈 - 미리보기 재생 시에도 유지
 
 import type { VideoInfo } from "./types";
 
@@ -7,6 +6,7 @@ export const itemCheckboxMap = new Map<Element, HTMLElement>();
 
 let fixedContainer: HTMLElement | null = null;
 let eventsRegistered = false;
+let rafScheduled = false;
 
 export function getFixedContainer(): HTMLElement {
   if (!fixedContainer) {
@@ -73,9 +73,12 @@ function getHeaderBottom(): number {
   return header?.getBoundingClientRect().bottom ?? 56;
 }
 
-export function updateCheckboxPosition(item: Element, cb: HTMLElement): void {
+export function updateCheckboxPosition(
+  item: Element,
+  cb: HTMLElement,
+  headerBottom: number
+): void {
   const rect = item.getBoundingClientRect();
-  const headerBottom = getHeaderBottom();
 
   if (
     rect.width === 0 ||
@@ -99,13 +102,24 @@ export function updateCheckboxPosition(item: Element, cb: HTMLElement): void {
 }
 
 export function updateAllPositions(): void {
-  itemCheckboxMap.forEach((cb, item) => {
-    if (document.contains(item)) {
-      updateCheckboxPosition(item, cb);
-    } else {
-      cb.remove();
-      itemCheckboxMap.delete(item);
-    }
+  // requestAnimationFrame으로 스크롤 이벤트 배치 처리
+  // getBoundingClientRect 호출을 프레임당 한 번으로 제한
+  if (rafScheduled) return;
+  rafScheduled = true;
+
+  requestAnimationFrame(() => {
+    rafScheduled = false;
+    // 루프 시작 시 헤더 높이 한 번만 계산
+    const headerBottom = getHeaderBottom();
+
+    itemCheckboxMap.forEach((cb, item) => {
+      if (document.contains(item)) {
+        updateCheckboxPosition(item, cb, headerBottom);
+      } else {
+        cb.remove();
+        itemCheckboxMap.delete(item);
+      }
+    });
   });
 }
 
@@ -128,7 +142,7 @@ export function registerFixedEvents(): void {
 export function injectFixedCheckbox(item: Element, videoInfo: VideoInfo): void {
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
-    updateCheckboxPosition(item, existing);
+    updateCheckboxPosition(item, existing, getHeaderBottom());
     return;
   }
 
@@ -137,7 +151,7 @@ export function injectFixedCheckbox(item: Element, videoInfo: VideoInfo): void {
   const cb = createFixedCheckbox(videoInfo);
   getFixedContainer().appendChild(cb);
   itemCheckboxMap.set(item, cb);
-  updateCheckboxPosition(item, cb);
+  updateCheckboxPosition(item, cb, getHeaderBottom());
 }
 
 export function removeAllFixedCheckboxes(): void {
@@ -147,6 +161,7 @@ export function removeAllFixedCheckboxes(): void {
   fixedContainer?.remove();
   fixedContainer = null;
   eventsRegistered = false;
+  rafScheduled = false;
 
   document.removeEventListener("scroll", updateAllPositions, true);
   window.removeEventListener("resize", updateAllPositions);
