@@ -142,10 +142,19 @@ describe("REMOVE_FROM_TEMP_LIST", () => {
     expect(response).toEqual({ success: true, list: [mockVideo] });
   });
 
-  it("payload가 불완전하면 Invalid payload를 반환한다", async () => {
+  it("videoId만 있는 payload로 영상을 제거한다", async () => {
     const response = await sendMessage({
       type: "REMOVE_FROM_TEMP_LIST",
       payload: { videoId: "video1" },
+    });
+    expect(removeFromTempList).toHaveBeenCalledWith("video1");
+    expect(response).toEqual({ success: true, list: [mockVideo] });
+  });
+
+  it("videoId가 없으면 Invalid payload를 반환한다", async () => {
+    const response = await sendMessage({
+      type: "REMOVE_FROM_TEMP_LIST",
+      payload: {},
     });
     expect(response).toEqual({ success: false, error: "Invalid payload" });
     expect(removeFromTempList).not.toHaveBeenCalled();
@@ -192,7 +201,8 @@ describe("GET_PLAYLISTS", () => {
 });
 
 describe("CREATE_PLAYLIST", () => {
-  it("재생목록을 생성하고 tempList를 초기화한다", async () => {
+  it("재생목록을 생성하고 tempList를 초기화하며 playlists와 list를 함께 반환한다", async () => {
+    (getTempList as jest.Mock).mockResolvedValue([]);
     const response = await sendMessage({
       type: "CREATE_PLAYLIST",
       payload: { title: "새 재생목록" },
@@ -203,6 +213,8 @@ describe("CREATE_PLAYLIST", () => {
     expect(response).toEqual({
       success: true,
       playlist: { id: "pl1", title: "새 재생목록", itemCount: 0 },
+      playlists: mockPlaylists,
+      list: [],
     });
   });
 

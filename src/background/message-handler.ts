@@ -28,7 +28,6 @@ function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id;
 }
 
-// 재생목록 API 호출 후 캐시 갱신 공통 헬퍼
 async function updateAndRefreshPlaylists(
   updateFn: () => Promise<void>,
   sendResponse: SendResponse
@@ -76,14 +75,15 @@ export function registerMessageHandler(): void {
       }
 
       case "REMOVE_FROM_TEMP_LIST": {
-        const video = message.payload as VideoItem;
-        if (!video?.videoId || !video?.title || !video?.thumbnail) {
+        // videoId만 있으면 삭제 가능 - title, thumbnail 불필요
+        const videoId = message.payload?.videoId;
+        if (!videoId) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
         (async () => {
           try {
-            await removeFromTempList(video.videoId);
+            await removeFromTempList(videoId);
             const list = await getTempList();
             sendResponse({ success: true, list });
           } catch (error) {
@@ -157,7 +157,8 @@ export function registerMessageHandler(): void {
             await clearTempList();
             const playlists = await getPlaylists();
             await setCachedPlaylists(playlists);
-            sendResponse({ success: true, playlist });
+            // playlists, list 함께 반환 - UI 즉시 반영 및 일관성
+            sendResponse({ success: true, playlist, playlists, list: [] });
           } catch (error) {
             sendResponse({
               success: false,
