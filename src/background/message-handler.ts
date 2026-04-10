@@ -8,7 +8,13 @@ import {
   setCachedPlaylists,
   Playlist,
 } from "./storage";
-import { getPlaylists, createPlaylist } from "./youtube-api";
+import {
+  getPlaylists,
+  createPlaylist,
+  deletePlaylist,
+  addItemToPlaylist,
+  removeItemFromPlaylist,
+} from "./youtube-api";
 
 export function registerMessageHandler(): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -80,17 +86,77 @@ export function registerMessageHandler(): void {
         }
         (async () => {
           try {
-            // API 호출로 재생목록 생성
             const playlist = await createPlaylist(title);
-
-            // tempList 초기화
             await clearTempList();
-
-            // 캐시 갱신
             const playlists = await getPlaylists();
             await setCachedPlaylists(playlists);
-
             sendResponse({ success: true, playlist });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
+        return true;
+      }
+
+      case "DELETE_PLAYLIST": {
+        const playlistId = message.payload?.playlistId;
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        (async () => {
+          try {
+            await deletePlaylist(playlistId);
+            const playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+            sendResponse({ success: true, playlists });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
+        return true;
+      }
+
+      case "ADD_TO_PLAYLIST": {
+        const { playlistId, videoId } = message.payload ?? {};
+        if (!playlistId || !videoId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        (async () => {
+          try {
+            await addItemToPlaylist(playlistId, videoId);
+            const playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+            sendResponse({ success: true, playlists });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
+        return true;
+      }
+
+      case "REMOVE_FROM_PLAYLIST": {
+        const { playlistItemId } = message.payload ?? {};
+        if (!playlistItemId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        (async () => {
+          try {
+            await removeItemFromPlaylist(playlistItemId);
+            const playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+            sendResponse({ success: true, playlists });
           } catch (error) {
             sendResponse({
               success: false,
