@@ -52,7 +52,6 @@ Object.defineProperty(chrome.runtime, "id", {
   writable: true,
 });
 
-// 등록된 리스너 저장
 let registeredListener: (
   message: unknown,
   sender: chrome.runtime.MessageSender,
@@ -123,10 +122,10 @@ describe("ADD_TO_TEMP_LIST", () => {
     expect(response).toEqual({ success: true, list: [mockVideo] });
   });
 
-  it("videoId가 없으면 Invalid payload를 반환한다", async () => {
+  it("payload가 불완전하면 Invalid payload를 반환한다", async () => {
     const response = await sendMessage({
       type: "ADD_TO_TEMP_LIST",
-      payload: {},
+      payload: { videoId: "video1" },
     });
     expect(response).toEqual({ success: false, error: "Invalid payload" });
     expect(addToTempList).not.toHaveBeenCalled();
@@ -143,10 +142,10 @@ describe("REMOVE_FROM_TEMP_LIST", () => {
     expect(response).toEqual({ success: true, list: [mockVideo] });
   });
 
-  it("videoId가 없으면 Invalid payload를 반환한다", async () => {
+  it("payload가 불완전하면 Invalid payload를 반환한다", async () => {
     const response = await sendMessage({
       type: "REMOVE_FROM_TEMP_LIST",
-      payload: {},
+      payload: { videoId: "video1" },
     });
     expect(response).toEqual({ success: false, error: "Invalid payload" });
     expect(removeFromTempList).not.toHaveBeenCalled();

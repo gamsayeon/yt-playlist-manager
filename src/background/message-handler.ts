@@ -16,13 +16,38 @@ import {
   removeItemFromPlaylist,
 } from "./youtube-api";
 
+type SendResponse = (response: {
+  success: boolean;
+  list?: VideoItem[];
+  playlists?: Playlist[];
+  playlist?: Playlist;
+  error?: string;
+}) => void;
+
 function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id;
 }
 
+// 재생목록 API 호출 후 캐시 갱신 공통 헬퍼
+async function updateAndRefreshPlaylists(
+  updateFn: () => Promise<void>,
+  sendResponse: SendResponse
+): Promise<void> {
+  try {
+    await updateFn();
+    const playlists = await getPlaylists();
+    await setCachedPlaylists(playlists);
+    sendResponse({ success: true, playlists });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
 export function registerMessageHandler(): void {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // 외부 sender 차단
     if (!isInternalSender(sender)) {
       sendResponse({ success: false, error: "Unauthorized sender" });
       return false;
@@ -30,42 +55,74 @@ export function registerMessageHandler(): void {
 
     switch (message.type) {
       case "ADD_TO_TEMP_LIST": {
-        const videoId = (message.payload as VideoItem)?.videoId;
-        if (!videoId) {
+        const video = message.payload as VideoItem;
+        if (!video?.videoId || !video?.title || !video?.thumbnail) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        addToTempList(message.payload as VideoItem).then(async () => {
-          const list = await getTempList();
-          sendResponse({ success: true, list });
-        });
+        (async () => {
+          try {
+            await addToTempList(video);
+            const list = await getTempList();
+            sendResponse({ success: true, list });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
         return true;
       }
 
       case "REMOVE_FROM_TEMP_LIST": {
-        const videoId = (message.payload as VideoItem)?.videoId;
-        if (!videoId) {
+        const video = message.payload as VideoItem;
+        if (!video?.videoId || !video?.title || !video?.thumbnail) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        removeFromTempList(videoId).then(async () => {
-          const list = await getTempList();
-          sendResponse({ success: true, list });
-        });
+        (async () => {
+          try {
+            await removeFromTempList(video.videoId);
+            const list = await getTempList();
+            sendResponse({ success: true, list });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
         return true;
       }
 
       case "GET_TEMP_LIST":
-        getTempList().then((list) => {
-          sendResponse({ success: true, list });
-        });
+        (async () => {
+          try {
+            const list = await getTempList();
+            sendResponse({ success: true, list });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
         return true;
 
       case "CLEAR_TEMP_LIST":
-        clearTempList().then(async () => {
-          const list = await getTempList();
-          sendResponse({ success: true, list });
-        });
+        (async () => {
+          try {
+            await clearTempList();
+            const list = await getTempList();
+            sendResponse({ success: true, list });
+          } catch (error) {
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })();
         return true;
 
       case "GET_PLAYLISTS":
@@ -117,19 +174,10 @@ export function registerMessageHandler(): void {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        (async () => {
-          try {
-            await deletePlaylist(playlistId);
-            const playlists = await getPlaylists();
-            await setCachedPlaylists(playlists);
-            sendResponse({ success: true, playlists });
-          } catch (error) {
-            sendResponse({
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        })();
+        updateAndRefreshPlaylists(
+          () => deletePlaylist(playlistId),
+          sendResponse
+        );
         return true;
       }
 
@@ -139,19 +187,10 @@ export function registerMessageHandler(): void {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        (async () => {
-          try {
-            await addItemToPlaylist(playlistId, videoId);
-            const playlists = await getPlaylists();
-            await setCachedPlaylists(playlists);
-            sendResponse({ success: true, playlists });
-          } catch (error) {
-            sendResponse({
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        })();
+        updateAndRefreshPlaylists(
+          () => addItemToPlaylist(playlistId, videoId),
+          sendResponse
+        );
         return true;
       }
 
@@ -161,19 +200,10 @@ export function registerMessageHandler(): void {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        (async () => {
-          try {
-            await removeItemFromPlaylist(playlistItemId);
-            const playlists = await getPlaylists();
-            await setCachedPlaylists(playlists);
-            sendResponse({ success: true, playlists });
-          } catch (error) {
-            sendResponse({
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            });
-          }
-        })();
+        updateAndRefreshPlaylists(
+          () => removeItemFromPlaylist(playlistItemId),
+          sendResponse
+        );
         return true;
       }
 
