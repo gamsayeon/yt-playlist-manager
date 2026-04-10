@@ -1,3 +1,5 @@
+import { clearTempList } from "./storage";
+
 const STORAGE_KEY = "userId";
 
 /** Access Token 획득 */
@@ -85,4 +87,6 @@ export async function logout(): Promise<void> {
   }
 
   await chrome.storage.local.remove(STORAGE_KEY);
+  // 로그아웃 시 tempList 초기화
+  await clearTempList();
 }
