@@ -3,7 +3,6 @@
 import type { VideoInfo } from "./types";
 import {
   itemCheckboxMap,
-  injectFixedCheckbox,
   updateCheckboxPosition,
   removeAllFixedCheckboxes,
   getFixedContainer,
