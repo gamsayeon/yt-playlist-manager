@@ -6,7 +6,7 @@ import {
   getFixedContainer,
   createFixedCheckbox,
   registerFixedEvents,
-  getHeaderBottom, // ✅ import 추가
+  getHeaderBottom,
 } from "./fixed-checkbox";
 
 const clipObservers = new WeakMap<Element, MutationObserver>();
@@ -53,7 +53,7 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
         injectHomeShortsCheckbox(item, videoInfo);
       }
     } else {
-      updateCheckboxPosition(item, cb, getHeaderBottom()); // ✅ 중복 제거
+      updateCheckboxPosition(item, cb, getHeaderBottom());
     }
 
     obs.observe(item, { childList: true, subtree: true });
@@ -77,16 +77,15 @@ export function parseHomeShortsInfo(item: Element): VideoInfo | null {
     item
       .querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
       ?.textContent?.trim() ?? "";
-
   const imgEl = item.querySelector(
     "div.ytThumbnailViewModelImage img"
   ) as HTMLImageElement | null;
 
-  // ✅ lazy loading 중이면 null 반환 → pendingItems에서 재시도
-  const src = imgEl?.src;
-  if (!src) return null;
+  // ✅ home-video.ts와 동일하게 fallback URL 즉시 사용
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
 
-  return { videoId, title, thumbnail: src };
+  return { videoId, title, thumbnail };
 }
 
 export function injectHomeShortsCheckbox(
@@ -101,7 +100,7 @@ export function injectHomeShortsCheckbox(
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
     if (existing.dataset.videoId === videoInfo.videoId) {
-      updateCheckboxPosition(item, existing, getHeaderBottom()); // ✅ 중복 제거
+      updateCheckboxPosition(item, existing, getHeaderBottom());
       return;
     }
     existing.remove();
@@ -113,7 +112,7 @@ export function injectHomeShortsCheckbox(
   const cb = createFixedCheckbox(videoInfo);
   getFixedContainer().appendChild(cb);
   itemCheckboxMap.set(item, cb);
-  updateCheckboxPosition(item, cb, getHeaderBottom()); // ✅ 중복 제거
+  updateCheckboxPosition(item, cb, getHeaderBottom());
 
   watchItemContent(item, cb);
 }

@@ -28,7 +28,6 @@ function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
 
-// ✅ pendingItems 제거 - querySelectorAll이 매 mutation마다 전체 스캔하므로 자동 재시도됨
 function tryInjectRichItem(item: Element): void {
   if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
   if (isLiveItem(item)) return;
@@ -43,6 +42,20 @@ function tryInjectRichItem(item: Element): void {
   }
 }
 
+function getVideoId(item: Element): string | null {
+  const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
+  if (isShorts) {
+    const link = item.querySelector(
+      "a.shortsLockupViewModelHostEndpoint[tabindex='-1']"
+    ) as HTMLAnchorElement | null;
+    return link?.href.match(/\/shorts\/([^?&]+)/)?.[1] ?? null;
+  }
+  const link = item.querySelector(
+    "a.yt-lockup-view-model__content-image, a.ytLockupViewModelContentImage"
+  ) as HTMLAnchorElement | null;
+  return link?.href.match(/[?&]v=([^&]+)/)?.[1] ?? null;
+}
+
 function injectCheckboxes(): void {
   if (!isLoggedIn) return;
   if (isNavigating) return;
@@ -54,8 +67,20 @@ function injectCheckboxes(): void {
     return;
   }
 
+  // ✅ 이미 처리된 요소는 건너뜀 (videoId가 다르면 재처리)
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
+    const processed = (item as HTMLElement).dataset.ytpmProcessed;
+    const currentVideoId = getVideoId(item);
+
+    // videoId가 같으면 이미 처리된 요소 → 스킵
+    if (processed && processed === currentVideoId) return;
+
     tryInjectRichItem(item);
+
+    // 처리 완료 표시
+    if (currentVideoId) {
+      (item as HTMLElement).dataset.ytpmProcessed = currentVideoId;
+    }
   });
 
   document
