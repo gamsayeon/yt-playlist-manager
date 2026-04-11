@@ -19,8 +19,8 @@ export interface Message {
 export interface MessageResponse {
   success: boolean;
   userId?: string;
-  list?: unknown[];
-  playlists?: unknown[];
-  playlist?: unknown;
   error?: string;
+  list?: import("../types").VideoItem[];
+  playlists?: import("../background/storage").Playlist[];
+  playlist?: import("../background/storage").Playlist;
 }

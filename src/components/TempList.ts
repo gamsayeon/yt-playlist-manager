@@ -1,6 +1,5 @@
 import { VideoItem } from "../types";
 
-// 투명 1x1 픽셀 데이터 URI - 깨진 아이콘 없이 배경색만 표시
 const PLACEHOLDER_SRC =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
@@ -55,12 +54,14 @@ export class TempList {
 
     const thumbnail = document.createElement("img");
     thumbnail.className = "video-thumbnail";
-    thumbnail.src = video.thumbnail;
     thumbnail.alt = video.title;
+    // error 이벤트 리스너를 src 설정 전에 등록
+    // 캐시된 이미지나 즉시 실패하는 경우 이벤트를 놓치지 않기 위함
     thumbnail.addEventListener("error", () => {
       thumbnail.src = PLACEHOLDER_SRC;
       thumbnail.classList.add("video-thumbnail--error");
     });
+    thumbnail.src = video.thumbnail;
 
     const title = document.createElement("p");
     title.className = "video-title";
