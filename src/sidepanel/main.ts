@@ -17,7 +17,6 @@ const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTML
 
 const tempList = new TempList(tempListContainer);
 
-// 생성 버튼 활성화/비활성화 업데이트
 function updateCreateBtn(list: VideoItem[]): void {
   const hasVideos = list.length > 0;
   const hasTitle = playlistTitleInput.value.trim().length > 0;
@@ -40,7 +39,6 @@ async function loadTempList(): Promise<void> {
 async function init(): Promise<void> {
   try {
     const { userId } = await chrome.storage.local.get("userId");
-
     if (userId) {
       showMainView(userId);
     } else {
@@ -64,7 +62,13 @@ function showMainView(userId: string): void {
   loadTempList();
 }
 
-// 제목 입력 시 버튼 활성화 상태 갱신
+function resetForm(): void {
+  playlistTitleInput.value = "";
+  playlistDescriptionInput.value = "";
+  playlistPrivacySelect.value = "private";
+  createPlaylistBtn.disabled = true;
+}
+
 playlistTitleInput.addEventListener("input", async () => {
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
@@ -73,6 +77,37 @@ playlistTitleInput.addEventListener("input", async () => {
     }
   } catch (error) {
     console.error("[YT Playlist Manager] tempList 조회 실패:", error);
+  }
+});
+
+// 재생목록 생성 버튼 클릭
+createPlaylistBtn.addEventListener("click", async () => {
+  const title = playlistTitleInput.value.trim();
+  const description = playlistDescriptionInput.value.trim();
+  const privacyStatus = playlistPrivacySelect.value;
+
+  if (!title) return;
+
+  try {
+    createPlaylistBtn.disabled = true;
+    createPlaylistBtn.textContent = "생성 중...";
+
+    const response: MessageResponse = await chrome.runtime.sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: { title, description, privacyStatus },
+    });
+
+    if (response.success) {
+      resetForm();
+    } else {
+      alert(`재생목록 생성 실패: ${response.error}`);
+      createPlaylistBtn.disabled = false;
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+    createPlaylistBtn.disabled = false;
+  } finally {
+    createPlaylistBtn.textContent = "재생목록 생성";
   }
 });
 

@@ -14,6 +14,7 @@ import {
   deletePlaylist,
   addItemToPlaylist,
   removeItemFromPlaylist,
+  PrivacyStatus,
 } from "./youtube-api";
 import { login, logout } from "./auth";
 
@@ -135,16 +136,32 @@ export function registerMessageHandler(): void {
         return true;
 
       case "CREATE_PLAYLIST": {
-        const title = message.payload?.title;
+        const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
         handleAsync(sendResponse, async () => {
-          const playlist = await createPlaylist(title);
+          // 1. 재생목록 생성
+          const playlist = await createPlaylist(
+            title,
+            description ?? "",
+            (privacyStatus ?? "private") as PrivacyStatus
+          );
+
+          // 2. tempList 조회 후 영상 순차 추가
+          const tempItems = await getTempList();
+          for (const video of tempItems) {
+            await addItemToPlaylist(playlist.id, video.videoId);
+          }
+
+          // 3. tempList 초기화
           await clearTempList();
+
+          // 4. 재생목록 캐시 갱신
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
+
           const list = await getTempList();
           sendResponse({ success: true, playlist, playlists, list });
         });
