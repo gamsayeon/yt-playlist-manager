@@ -27,14 +27,6 @@ function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
 
-function resetAllCheckboxStates(): void {
-  document.querySelectorAll("[data-ytpm-checkbox]").forEach((cb) => {
-    const input = cb.querySelector("input") as HTMLInputElement | null;
-    if (input) input.checked = false;
-    (cb as HTMLElement).dataset.checked = "false";
-  });
-}
-
 function injectCheckboxes(): void {
   if (!isLoggedIn) return;
 
@@ -113,36 +105,35 @@ document.addEventListener("yt-navigate-finish", () => {
   injectCheckboxes();
 });
 
-// userId 변경 감지 - 로그인/로그아웃 처리
+// 스토리지 변경 중앙 관리
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !("userId" in changes)) return;
-  const { newValue } = changes.userId;
+  if (area !== "local") return;
 
-  if (newValue) {
-    // 로그인 시 체크박스 삽입
-    isLoggedIn = true;
-    injectCheckboxes();
-  } else {
-    // 로그아웃 시 체크박스 제거 및 체크 상태 초기화
-    isLoggedIn = false;
-    resetAllCheckboxStates();
-    removeCheckboxes();
-    removeHomeShortsCheckboxes();
-  }
-});
-
-// tempList 변경 감지 - 체크 상태 동기화
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !("tempList" in changes)) return;
-  const list: { videoId: string }[] = changes.tempList.newValue ?? [];
-  const checkedIds = new Set(list.map((v) => v.videoId));
-
-  document.querySelectorAll("[data-ytpm-checkbox]").forEach((cb) => {
-    const input = cb.querySelector("input") as HTMLInputElement | null;
-    const videoId = (cb as HTMLElement).dataset.videoId;
-    if (input && videoId) {
-      input.checked = checkedIds.has(videoId);
-      (cb as HTMLElement).dataset.checked = String(input.checked);
+  // userId 변경 감지 - 로그인/로그아웃 처리
+  if ("userId" in changes) {
+    const { newValue } = changes.userId;
+    if (newValue) {
+      isLoggedIn = true;
+      injectCheckboxes();
+    } else {
+      isLoggedIn = false;
+      removeCheckboxes();
+      removeHomeShortsCheckboxes();
     }
-  });
+  }
+
+  // tempList 변경 감지 - 체크 상태 동기화
+  if ("tempList" in changes) {
+    const list: { videoId: string }[] = changes.tempList.newValue ?? [];
+    const checkedIds = new Set(list.map((v) => v.videoId));
+
+    document.querySelectorAll("[data-ytpm-checkbox]").forEach((cb) => {
+      const input = cb.querySelector("input") as HTMLInputElement | null;
+      const videoId = (cb as HTMLElement).dataset.videoId;
+      if (input && videoId) {
+        input.checked = checkedIds.has(videoId);
+        (cb as HTMLElement).dataset.checked = String(input.checked);
+      }
+    });
+  }
 });

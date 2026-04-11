@@ -1,5 +1,9 @@
 import { VideoItem } from "../types";
 
+// 투명 1x1 픽셀 데이터 URI - 깨진 아이콘 없이 배경색만 표시
+const PLACEHOLDER_SRC =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 export class TempList {
   private container: HTMLElement;
 
@@ -54,8 +58,7 @@ export class TempList {
     thumbnail.src = video.thumbnail;
     thumbnail.alt = video.title;
     thumbnail.addEventListener("error", () => {
-      thumbnail.src = "";
-      thumbnail.alt = "썸네일 없음";
+      thumbnail.src = PLACEHOLDER_SRC;
       thumbnail.classList.add("video-thumbnail--error");
     });
 
