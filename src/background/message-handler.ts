@@ -15,9 +15,11 @@ import {
   addItemToPlaylist,
   removeItemFromPlaylist,
 } from "./youtube-api";
+import { login, logout } from "./auth";
 
 type SendResponse = (response: {
   success: boolean;
+  userId?: string;
   list?: VideoItem[];
   playlists?: Playlist[];
   playlist?: Playlist;
@@ -28,7 +30,6 @@ function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id;
 }
 
-// 비동기 핸들러 공통 래퍼
 async function handleAsync(
   sendResponse: SendResponse,
   fn: () => Promise<void>
@@ -43,7 +44,6 @@ async function handleAsync(
   }
 }
 
-// 재생목록 API 호출 후 캐시 갱신 공통 헬퍼
 async function updateAndRefreshPlaylists(
   updateFn: () => Promise<void>,
   sendResponse: SendResponse
@@ -64,6 +64,20 @@ export function registerMessageHandler(): void {
     }
 
     switch (message.type) {
+      case "LOGIN":
+        handleAsync(sendResponse, async () => {
+          const userId = await login();
+          sendResponse({ success: true, userId });
+        });
+        return true;
+
+      case "LOGOUT":
+        handleAsync(sendResponse, async () => {
+          await logout();
+          sendResponse({ success: true });
+        });
+        return true;
+
       case "ADD_TO_TEMP_LIST": {
         const video = message.payload as VideoItem;
         if (!video?.videoId || !video?.title || !video?.thumbnail) {
@@ -131,7 +145,6 @@ export function registerMessageHandler(): void {
           await clearTempList();
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
-          // getTempList()로 실제 값 반환 - 데이터 일관성 보장
           const list = await getTempList();
           sendResponse({ success: true, playlist, playlists, list });
         });

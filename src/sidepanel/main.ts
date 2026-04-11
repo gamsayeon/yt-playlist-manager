@@ -1,10 +1,26 @@
 import { MessageResponse } from "../types/message";
+import { VideoItem } from "../types";
+import { TempList } from "../components/TempList";
 
 const loginView = document.getElementById("login-view") as HTMLDivElement;
 const mainView = document.getElementById("main-view") as HTMLDivElement;
 const loginBtn = document.getElementById("login-btn") as HTMLButtonElement;
 const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
 const userInfo = document.getElementById("user-info") as HTMLParagraphElement;
+const tempListContainer = document.getElementById("temp-list-container") as HTMLDivElement;
+
+const tempList = new TempList(tempListContainer);
+
+async function loadTempList(): Promise<void> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
+    if (response.success) {
+      tempList.render(response.list as VideoItem[]);
+    }
+  } catch (error) {
+    console.error("[YT Playlist Manager] tempList 로드 실패:", error);
+  }
+}
 
 async function init(): Promise<void> {
   try {
@@ -30,17 +46,25 @@ function showMainView(userId: string): void {
   loginView.classList.add("hidden");
   mainView.classList.remove("hidden");
   userInfo.textContent = `채널 ID: ${userId}`;
+  loadTempList();
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !("userId" in changes)) return;
+  if (area !== "local") return;
 
-  const { newValue } = changes.userId;
+  if ("userId" in changes) {
+    const { newValue } = changes.userId;
+    if (newValue) {
+      showMainView(newValue);
+    } else {
+      showLoginView();
+    }
+  }
 
-  if (newValue) {
-    showMainView(newValue);
-  } else {
-    showLoginView();
+  // Content Script에서 체크/해제 시 실시간 갱신
+  if ("tempList" in changes) {
+    const list = (changes.tempList.newValue as VideoItem[]) ?? [];
+    tempList.render(list);
   }
 });
 

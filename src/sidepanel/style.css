@@ -16,8 +16,6 @@ h1 {
 }
 
 button {
-  width: 100%;
-  padding: 10px;
   cursor: pointer;
   border: none;
   border-radius: 6px;
@@ -25,11 +23,15 @@ button {
 }
 
 #login-btn {
+  width: 100%;
+  padding: 10px;
   background-color: #4285f4;
   color: white;
 }
 
 #logout-btn {
+  width: 100%;
+  padding: 10px;
   background-color: #f1f1f1;
   color: #333;
 }
@@ -42,4 +44,86 @@ button {
 
 .hidden {
   display: none;
+}
+
+/* TempList */
+#temp-list-container {
+  margin-top: 16px;
+}
+
+.temp-list-empty {
+  font-size: 13px;
+  color: #999;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.temp-list-clear-btn {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #ff4444;
+  color: white;
+  font-size: 13px;
+}
+
+.temp-list-clear-btn:hover {
+  background-color: #cc0000;
+}
+
+.video-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.video-thumbnail {
+  width: 80px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background-color: #eee;
+}
+
+.video-thumbnail--error {
+  background-color: #ddd;
+}
+
+.video-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.video-title {
+  flex: 1;
+  font-size: 12px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-remove-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  color: #999;
+  font-size: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-remove-btn:hover {
+  background-color: #f1f1f1;
+  color: #333;
 }
