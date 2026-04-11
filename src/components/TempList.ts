@@ -29,10 +29,8 @@ export class TempList {
   private createEmptyState(): HTMLElement {
     const empty = document.createElement("div");
     empty.className = "temp-list-empty";
-
     const message = document.createElement("p");
     message.textContent = "선택된 영상이 없습니다.";
-
     empty.appendChild(message);
     return empty;
   }
@@ -55,8 +53,6 @@ export class TempList {
     const thumbnail = document.createElement("img");
     thumbnail.className = "video-thumbnail";
     thumbnail.alt = video.title;
-    // error 이벤트 리스너를 src 설정 전에 등록
-    // 캐시된 이미지나 즉시 실패하는 경우 이벤트를 놓치지 않기 위함
     thumbnail.addEventListener("error", () => {
       thumbnail.src = PLACEHOLDER_SRC;
       thumbnail.classList.add("video-thumbnail--error");

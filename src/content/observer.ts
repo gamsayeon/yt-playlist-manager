@@ -1,9 +1,24 @@
-const OBSERVER_THROTTLE_MS = 300;
+const OBSERVER_THROTTLE_MS = 500;
 
 let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 
 function onMutation(callback: () => void): MutationObserver {
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver((mutations) => {
+    const isOwnMutation = mutations.every((m) =>
+      Array.from(m.addedNodes).every((node) => {
+        if (node instanceof HTMLElement) {
+          return (
+            node.hasAttribute("data-ytpm-checkbox") ||
+            node.hasAttribute("data-ytpm-fixed-container") ||
+            node.closest("[data-ytpm-checkbox]") !== null ||
+            node.closest("[data-ytpm-fixed-container]") !== null
+          );
+        }
+        return false;
+      })
+    );
+
+    if (isOwnMutation) return;
     if (throttleTimer) return;
 
     throttleTimer = setTimeout(() => {
@@ -12,10 +27,7 @@ function onMutation(callback: () => void): MutationObserver {
     }, OBSERVER_THROTTLE_MS);
   });
 
-  // #content로 범위 제한, 없으면 document.body로 fallback
-  const target = document.querySelector("#content, #contents, ytd-app") ?? document.body;
-
-  observer.observe(target, {
+  observer.observe(document.body, {
     childList: true,
     subtree: true,
   });

@@ -29,9 +29,11 @@ export function createCheckbox(videoInfo: VideoInfo): HTMLElement {
   input.addEventListener("change", (e) => {
     e.stopPropagation();
     const messageType = input.checked ? "ADD_TO_TEMP_LIST" : "REMOVE_FROM_TEMP_LIST";
-    chrome.runtime.sendMessage({ type: messageType, payload: videoInfo }, () => {
+    chrome.runtime.sendMessage({ type: messageType, payload: videoInfo }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error("[YT Playlist Manager] sendMessage error", chrome.runtime.lastError);
+        console.error("[YTPM] sendMessage 실패:", chrome.runtime.lastError.message);
+      } else if (!response?.success) {
+        console.error("[YTPM] 처리 실패:", response?.error, "videoInfo:", videoInfo);
       }
     });
     wrapper.dataset.checked = String(input.checked);
@@ -42,13 +44,14 @@ export function createCheckbox(videoInfo: VideoInfo): HTMLElement {
 }
 
 export function injectInto(anchor: HTMLElement, videoInfo: VideoInfo): void {
-  const existing = anchor.querySelector("[data-ytpm-checkbox]") as HTMLElement | null;
+  const existing = anchor.querySelector(
+    "[data-ytpm-checkbox]"
+  ) as HTMLElement | null;
   if (existing) {
     if (existing.dataset.videoId === videoInfo.videoId) return;
     existing.remove();
   }
 
-  // static인 경우에만 relative로 변경 (YouTube 레이아웃 충돌 방지)
   if (window.getComputedStyle(anchor).position === "static") {
     anchor.style.position = "relative";
   }

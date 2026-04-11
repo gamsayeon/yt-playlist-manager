@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM"],
-    "types": ["chrome", "jest", "node"],
+    "types": ["chrome"],
     "strict": true,
     "esModuleInterop": true,
     "noUnusedLocals": true,

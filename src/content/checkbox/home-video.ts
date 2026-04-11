@@ -1,5 +1,3 @@
-// ✅ 홈피드 일반/회원전용 영상
-
 import type { VideoInfo } from "./types";
 import { injectInto } from "./utils";
 
@@ -17,15 +15,21 @@ export function parseHomeVideoInfo(item: Element): VideoInfo | null {
     item.querySelector(
       "h3.yt-lockup-metadata-view-model__heading-reset a span, h3.ytLockupMetadataViewModelHeadingReset a span"
     )?.textContent?.trim() ?? "";
-  const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  const imgEl = item.querySelector(
+    "div.ytThumbnailViewModelImage img"
+  ) as HTMLImageElement | null;
+
+  // ✅ 핵심 수정: src가 빈 문자열이면 fallback URL 사용
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+  return { videoId, title, thumbnail };
 }
 
-export function injectHomeVideoCheckbox(item: Element, videoInfo: VideoInfo): void {
+export function injectHomeVideoCheckbox(
+  item: Element,
+  videoInfo: VideoInfo
+): void {
   const anchor = item.querySelector(
     "a.yt-lockup-view-model__content-image, a.ytLockupViewModelContentImage"
   ) as HTMLElement | null;

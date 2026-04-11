@@ -1,5 +1,3 @@
-// src/content/checkbox/home-shorts.ts
-
 import type { VideoInfo } from "./types";
 import {
   itemCheckboxMap,
@@ -7,6 +5,8 @@ import {
   removeAllFixedCheckboxes,
   getFixedContainer,
   createFixedCheckbox,
+  registerFixedEvents,
+  getHeaderBottom,
 } from "./fixed-checkbox";
 
 const clipObservers = new WeakMap<Element, MutationObserver>();
@@ -42,10 +42,9 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
     if (!match) return;
 
     const currentVideoId = match[1];
-
     obs.disconnect();
 
-    if (cb.getAttribute("data-video-id") !== currentVideoId) {
+    if (cb.dataset.videoId !== currentVideoId) {
       cb.remove();
       itemCheckboxMap.delete(item);
       itemObservers.delete(item);
@@ -54,10 +53,7 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
         injectHomeShortsCheckbox(item, videoInfo);
       }
     } else {
-      const headerBottom =
-        (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-          ?.getBoundingClientRect().bottom ?? 56;
-      updateCheckboxPosition(item, cb, headerBottom);
+      updateCheckboxPosition(item, cb, getHeaderBottom());
     }
 
     obs.observe(item, { childList: true, subtree: true });
@@ -84,11 +80,12 @@ export function parseHomeShortsInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "div.ytThumbnailViewModelImage img"
   ) as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+
+  // ✅ home-video.ts와 동일하게 fallback URL 즉시 사용
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+  return { videoId, title, thumbnail };
 }
 
 export function injectHomeShortsCheckbox(
@@ -102,21 +99,20 @@ export function injectHomeShortsCheckbox(
 
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
-    const headerBottom =
-      (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-        ?.getBoundingClientRect().bottom ?? 56;
-    updateCheckboxPosition(item, existing, headerBottom);
-    return;
+    if (existing.dataset.videoId === videoInfo.videoId) {
+      updateCheckboxPosition(item, existing, getHeaderBottom());
+      return;
+    }
+    existing.remove();
+    itemCheckboxMap.delete(item);
   }
+
+  registerFixedEvents();
 
   const cb = createFixedCheckbox(videoInfo);
   getFixedContainer().appendChild(cb);
   itemCheckboxMap.set(item, cb);
-
-  const headerBottom =
-    (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-      ?.getBoundingClientRect().bottom ?? 56;
-  updateCheckboxPosition(item, cb, headerBottom);
+  updateCheckboxPosition(item, cb, getHeaderBottom());
 
   watchItemContent(item, cb);
 }
