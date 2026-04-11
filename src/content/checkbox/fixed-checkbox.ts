@@ -25,6 +25,14 @@ export function getFixedContainer(): HTMLElement {
   return fixedContainer;
 }
 
+// ✅ export 추가
+export function getHeaderBottom(): number {
+  const header = document.querySelector(
+    "ytd-masthead, #masthead-container"
+  ) as HTMLElement | null;
+  return header?.getBoundingClientRect().bottom ?? 56;
+}
+
 export function createFixedCheckbox(videoInfo: VideoInfo): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.setAttribute("data-ytpm-checkbox", "true");
@@ -64,13 +72,6 @@ export function createFixedCheckbox(videoInfo: VideoInfo): HTMLElement {
 
   wrapper.appendChild(input);
   return wrapper;
-}
-
-function getHeaderBottom(): number {
-  const header = document.querySelector(
-    "ytd-masthead, #masthead-container"
-  ) as HTMLElement | null;
-  return header?.getBoundingClientRect().bottom ?? 56;
 }
 
 export function updateCheckboxPosition(

@@ -23,12 +23,12 @@ console.log("[YT Playlist Manager] content script loaded");
 
 let isLoggedIn = false;
 let isNavigating = false;
-const pendingItems = new Set<Element>();
 
 function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
 
+// ✅ pendingItems 제거 - querySelectorAll이 매 mutation마다 전체 스캔하므로 자동 재시도됨
 function tryInjectRichItem(item: Element): void {
   if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
   if (isLiveItem(item)) return;
@@ -36,32 +36,11 @@ function tryInjectRichItem(item: Element): void {
   const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
   if (isShorts) {
     const videoInfo = parseHomeShortsInfo(item);
-    if (videoInfo && videoInfo.thumbnail) {
-      injectHomeShortsCheckbox(item, videoInfo);
-      pendingItems.delete(item);
-    } else {
-      pendingItems.add(item);
-    }
+    if (videoInfo) injectHomeShortsCheckbox(item, videoInfo);
   } else {
     const videoInfo = parseHomeVideoInfo(item);
-    if (videoInfo && videoInfo.thumbnail) {
-      injectHomeVideoCheckbox(item, videoInfo);
-      pendingItems.delete(item);
-    } else {
-      pendingItems.add(item);
-    }
+    if (videoInfo) injectHomeVideoCheckbox(item, videoInfo);
   }
-}
-
-function retryPendingItems(): void {
-  if (pendingItems.size === 0) return;
-  pendingItems.forEach((item) => {
-    if (!document.contains(item)) {
-      pendingItems.delete(item);
-      return;
-    }
-    tryInjectRichItem(item);
-  });
 }
 
 function injectCheckboxes(): void {
@@ -74,8 +53,6 @@ function injectCheckboxes(): void {
     injectShortsPageCheckbox();
     return;
   }
-
-  retryPendingItems();
 
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
     tryInjectRichItem(item);
@@ -131,7 +108,6 @@ onMutation(() => injectCheckboxes());
 
 document.addEventListener("yt-navigate-start", () => {
   isNavigating = true;
-  pendingItems.clear();
   removeHomeShortsCheckboxes();
   removeCheckboxes();
 });
@@ -148,13 +124,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const { newValue } = changes.userId;
     if (newValue) {
       isLoggedIn = true;
-      pendingItems.clear();
       removeCheckboxes();
       removeHomeShortsCheckboxes();
       injectCheckboxes();
     } else {
       isLoggedIn = false;
-      pendingItems.clear();
       removeCheckboxes();
       removeHomeShortsCheckboxes();
     }

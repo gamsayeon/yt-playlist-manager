@@ -6,6 +6,7 @@ import {
   getFixedContainer,
   createFixedCheckbox,
   registerFixedEvents,
+  getHeaderBottom, // ✅ import 추가
 } from "./fixed-checkbox";
 
 const clipObservers = new WeakMap<Element, MutationObserver>();
@@ -41,7 +42,6 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
     if (!match) return;
 
     const currentVideoId = match[1];
-
     obs.disconnect();
 
     if (cb.dataset.videoId !== currentVideoId) {
@@ -53,13 +53,7 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
         injectHomeShortsCheckbox(item, videoInfo);
       }
     } else {
-      const headerBottom =
-        (
-          document.querySelector(
-            "ytd-masthead, #masthead-container"
-          ) as HTMLElement | null
-        )?.getBoundingClientRect().bottom ?? 56;
-      updateCheckboxPosition(item, cb, headerBottom);
+      updateCheckboxPosition(item, cb, getHeaderBottom()); // ✅ 중복 제거
     }
 
     obs.observe(item, { childList: true, subtree: true });
@@ -83,18 +77,16 @@ export function parseHomeShortsInfo(item: Element): VideoInfo | null {
     item
       .querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
       ?.textContent?.trim() ?? "";
+
   const imgEl = item.querySelector(
     "div.ytThumbnailViewModelImage img"
   ) as HTMLImageElement | null;
 
-  // ?? → || 로 변경 (빈 문자열도 fallback 처리)
-  const thumbnail =
-    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  // ✅ lazy loading 중이면 null 반환 → pendingItems에서 재시도
+  const src = imgEl?.src;
+  if (!src) return null;
 
-  // thumbnail이 빈 문자열이면 아직 lazy loading 중 → null 반환
-  if (!thumbnail) return null;
-
-  return { videoId, title, thumbnail };
+  return { videoId, title, thumbnail: src };
 }
 
 export function injectHomeShortsCheckbox(
@@ -109,13 +101,7 @@ export function injectHomeShortsCheckbox(
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
     if (existing.dataset.videoId === videoInfo.videoId) {
-      const headerBottom =
-        (
-          document.querySelector(
-            "ytd-masthead, #masthead-container"
-          ) as HTMLElement | null
-        )?.getBoundingClientRect().bottom ?? 56;
-      updateCheckboxPosition(item, existing, headerBottom);
+      updateCheckboxPosition(item, existing, getHeaderBottom()); // ✅ 중복 제거
       return;
     }
     existing.remove();
@@ -127,14 +113,7 @@ export function injectHomeShortsCheckbox(
   const cb = createFixedCheckbox(videoInfo);
   getFixedContainer().appendChild(cb);
   itemCheckboxMap.set(item, cb);
-
-  const headerBottom =
-    (
-      document.querySelector(
-        "ytd-masthead, #masthead-container"
-      ) as HTMLElement | null
-    )?.getBoundingClientRect().bottom ?? 56;
-  updateCheckboxPosition(item, cb, headerBottom);
+  updateCheckboxPosition(item, cb, getHeaderBottom()); // ✅ 중복 제거
 
   watchItemContent(item, cb);
 }
