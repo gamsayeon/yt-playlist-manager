@@ -9,13 +9,28 @@ const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
 const userInfo = document.getElementById("user-info") as HTMLParagraphElement;
 const tempListContainer = document.getElementById("temp-list-container") as HTMLDivElement;
 
+// 재생목록 생성 폼 요소
+const playlistTitleInput = document.getElementById("playlist-title") as HTMLInputElement;
+const playlistDescriptionInput = document.getElementById("playlist-description") as HTMLTextAreaElement;
+const playlistPrivacySelect = document.getElementById("playlist-privacy") as HTMLSelectElement;
+const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTMLButtonElement;
+
 const tempList = new TempList(tempListContainer);
+
+// 생성 버튼 활성화/비활성화 업데이트
+function updateCreateBtn(list: VideoItem[]): void {
+  const hasVideos = list.length > 0;
+  const hasTitle = playlistTitleInput.value.trim().length > 0;
+  createPlaylistBtn.disabled = !hasVideos || !hasTitle;
+}
 
 async function loadTempList(): Promise<void> {
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
     if (response.success) {
-      tempList.render(response.list as VideoItem[]);
+      const list = response.list as VideoItem[];
+      tempList.render(list);
+      updateCreateBtn(list);
     }
   } catch (error) {
     console.error("[YT Playlist Manager] tempList 로드 실패:", error);
@@ -49,6 +64,18 @@ function showMainView(userId: string): void {
   loadTempList();
 }
 
+// 제목 입력 시 버튼 활성화 상태 갱신
+playlistTitleInput.addEventListener("input", async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
+    if (response.success) {
+      updateCreateBtn(response.list as VideoItem[]);
+    }
+  } catch (error) {
+    console.error("[YT Playlist Manager] tempList 조회 실패:", error);
+  }
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
 
@@ -61,10 +88,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
   }
 
-  // Content Script에서 체크/해제 시 실시간 갱신
   if ("tempList" in changes) {
     const list = (changes.tempList.newValue as VideoItem[]) ?? [];
     tempList.render(list);
+    updateCreateBtn(list);
   }
 });
 
