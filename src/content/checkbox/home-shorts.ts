@@ -1,5 +1,3 @@
-// src/content/checkbox/home-shorts.ts
-
 import type { VideoInfo } from "./types";
 import {
   itemCheckboxMap,
@@ -7,6 +5,7 @@ import {
   removeAllFixedCheckboxes,
   getFixedContainer,
   createFixedCheckbox,
+  registerFixedEvents,
 } from "./fixed-checkbox";
 
 const clipObservers = new WeakMap<Element, MutationObserver>();
@@ -45,7 +44,7 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
 
     obs.disconnect();
 
-    if (cb.getAttribute("data-video-id") !== currentVideoId) {
+    if (cb.dataset.videoId !== currentVideoId) {
       cb.remove();
       itemCheckboxMap.delete(item);
       itemObservers.delete(item);
@@ -55,8 +54,11 @@ function watchItemContent(item: Element, cb: HTMLElement): void {
       }
     } else {
       const headerBottom =
-        (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-          ?.getBoundingClientRect().bottom ?? 56;
+        (
+          document.querySelector(
+            "ytd-masthead, #masthead-container"
+          ) as HTMLElement | null
+        )?.getBoundingClientRect().bottom ?? 56;
       updateCheckboxPosition(item, cb, headerBottom);
     }
 
@@ -84,11 +86,15 @@ export function parseHomeShortsInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "div.ytThumbnailViewModelImage img"
   ) as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+
+  // ?? → || 로 변경 (빈 문자열도 fallback 처리)
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+  // thumbnail이 빈 문자열이면 아직 lazy loading 중 → null 반환
+  if (!thumbnail) return null;
+
+  return { videoId, title, thumbnail };
 }
 
 export function injectHomeShortsCheckbox(
@@ -102,20 +108,32 @@ export function injectHomeShortsCheckbox(
 
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
-    const headerBottom =
-      (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-        ?.getBoundingClientRect().bottom ?? 56;
-    updateCheckboxPosition(item, existing, headerBottom);
-    return;
+    if (existing.dataset.videoId === videoInfo.videoId) {
+      const headerBottom =
+        (
+          document.querySelector(
+            "ytd-masthead, #masthead-container"
+          ) as HTMLElement | null
+        )?.getBoundingClientRect().bottom ?? 56;
+      updateCheckboxPosition(item, existing, headerBottom);
+      return;
+    }
+    existing.remove();
+    itemCheckboxMap.delete(item);
   }
+
+  registerFixedEvents();
 
   const cb = createFixedCheckbox(videoInfo);
   getFixedContainer().appendChild(cb);
   itemCheckboxMap.set(item, cb);
 
   const headerBottom =
-    (document.querySelector("ytd-masthead, #masthead-container") as HTMLElement | null)
-      ?.getBoundingClientRect().bottom ?? 56;
+    (
+      document.querySelector(
+        "ytd-masthead, #masthead-container"
+      ) as HTMLElement | null
+    )?.getBoundingClientRect().bottom ?? 56;
   updateCheckboxPosition(item, cb, headerBottom);
 
   watchItemContent(item, cb);

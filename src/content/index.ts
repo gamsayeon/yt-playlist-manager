@@ -22,13 +22,51 @@ import { onMutation } from "./observer";
 console.log("[YT Playlist Manager] content script loaded");
 
 let isLoggedIn = false;
+let isNavigating = false;
+const pendingItems = new Set<Element>();
 
 function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
 
+function tryInjectRichItem(item: Element): void {
+  if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
+  if (isLiveItem(item)) return;
+
+  const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
+  if (isShorts) {
+    const videoInfo = parseHomeShortsInfo(item);
+    if (videoInfo && videoInfo.thumbnail) {
+      injectHomeShortsCheckbox(item, videoInfo);
+      pendingItems.delete(item);
+    } else {
+      pendingItems.add(item);
+    }
+  } else {
+    const videoInfo = parseHomeVideoInfo(item);
+    if (videoInfo && videoInfo.thumbnail) {
+      injectHomeVideoCheckbox(item, videoInfo);
+      pendingItems.delete(item);
+    } else {
+      pendingItems.add(item);
+    }
+  }
+}
+
+function retryPendingItems(): void {
+  if (pendingItems.size === 0) return;
+  pendingItems.forEach((item) => {
+    if (!document.contains(item)) {
+      pendingItems.delete(item);
+      return;
+    }
+    tryInjectRichItem(item);
+  });
+}
+
 function injectCheckboxes(): void {
   if (!isLoggedIn) return;
+  if (isNavigating) return;
 
   const path = location.pathname;
 
@@ -37,26 +75,20 @@ function injectCheckboxes(): void {
     return;
   }
 
+  retryPendingItems();
+
   document.querySelectorAll("ytd-rich-item-renderer").forEach((item) => {
-    if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
-    if (isLiveItem(item)) return;
-
-    const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
-    if (isShorts) {
-      const videoInfo = parseHomeShortsInfo(item);
-      if (videoInfo) injectHomeShortsCheckbox(item, videoInfo);
-    } else {
-      const videoInfo = parseHomeVideoInfo(item);
-      if (videoInfo) injectHomeVideoCheckbox(item, videoInfo);
-    }
+    tryInjectRichItem(item);
   });
 
-  document.querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)").forEach((item) => {
-    if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
-    if (isLiveItem(item)) return;
-    const videoInfo = parseChannelVideoInfo(item);
-    if (videoInfo) injectChannelCheckbox(item, videoInfo);
-  });
+  document
+    .querySelectorAll("ytd-rich-item-renderer:has(ytd-rich-grid-media)")
+    .forEach((item) => {
+      if (item.querySelector("a.shortsLockupViewModelHostEndpoint")) return;
+      if (isLiveItem(item)) return;
+      const videoInfo = parseChannelVideoInfo(item);
+      if (videoInfo) injectChannelCheckbox(item, videoInfo);
+    });
 
   document.querySelectorAll("ytd-grid-video-renderer").forEach((item) => {
     if (isLiveItem(item)) return;
@@ -82,15 +114,14 @@ function injectCheckboxes(): void {
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
 
-  document.querySelectorAll(
-    "ytd-reel-shelf-renderer ytm-shorts-lockup-view-model-v2"
-  ).forEach((item) => {
-    const videoInfo = parseWatchShortsInfo(item);
-    if (videoInfo) injectWatchShortsCheckbox(item, videoInfo);
-  });
+  document
+    .querySelectorAll("ytd-reel-shelf-renderer ytm-shorts-lockup-view-model-v2")
+    .forEach((item) => {
+      const videoInfo = parseWatchShortsInfo(item);
+      if (videoInfo) injectWatchShortsCheckbox(item, videoInfo);
+    });
 }
 
-// 초기 로그인 상태 확인
 chrome.storage.local.get("userId").then(({ userId }) => {
   isLoggedIn = !!userId;
   if (isLoggedIn) injectCheckboxes();
@@ -98,31 +129,37 @@ chrome.storage.local.get("userId").then(({ userId }) => {
 
 onMutation(() => injectCheckboxes());
 
-// yt-navigate-finish 이벤트로 SPA 네비게이션 감지
-document.addEventListener("yt-navigate-finish", () => {
+document.addEventListener("yt-navigate-start", () => {
+  isNavigating = true;
+  pendingItems.clear();
   removeHomeShortsCheckboxes();
   removeCheckboxes();
+});
+
+document.addEventListener("yt-navigate-finish", () => {
+  isNavigating = false;
   injectCheckboxes();
 });
 
-// 스토리지 변경 중앙 관리
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
 
-  // userId 변경 감지 - 로그인/로그아웃 처리
   if ("userId" in changes) {
     const { newValue } = changes.userId;
     if (newValue) {
       isLoggedIn = true;
+      pendingItems.clear();
+      removeCheckboxes();
+      removeHomeShortsCheckboxes();
       injectCheckboxes();
     } else {
       isLoggedIn = false;
+      pendingItems.clear();
       removeCheckboxes();
       removeHomeShortsCheckboxes();
     }
   }
 
-  // tempList 변경 감지 - 체크 상태 동기화
   if ("tempList" in changes) {
     const list: { videoId: string }[] = changes.tempList.newValue ?? [];
     const checkedIds = new Set(list.map((v) => v.videoId));

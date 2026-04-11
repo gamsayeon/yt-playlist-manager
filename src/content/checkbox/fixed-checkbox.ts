@@ -52,9 +52,11 @@ export function createFixedCheckbox(videoInfo: VideoInfo): HTMLElement {
   input.addEventListener("change", (e) => {
     e.stopPropagation();
     const messageType = input.checked ? "ADD_TO_TEMP_LIST" : "REMOVE_FROM_TEMP_LIST";
-    chrome.runtime.sendMessage({ type: messageType, payload: videoInfo }, () => {
+    chrome.runtime.sendMessage({ type: messageType, payload: videoInfo }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error("[YT Playlist Manager] sendMessage error", chrome.runtime.lastError);
+        console.error("[YTPM] sendMessage 실패:", chrome.runtime.lastError.message);
+      } else if (!response?.success) {
+        console.error("[YTPM] 처리 실패:", response?.error, "videoInfo:", videoInfo);
       }
     });
     wrapper.dataset.checked = String(input.checked);
@@ -137,7 +139,6 @@ export function registerFixedEvents(): void {
 export function injectFixedCheckbox(item: Element, videoInfo: VideoInfo): void {
   if (itemCheckboxMap.has(item)) {
     const existing = itemCheckboxMap.get(item)!;
-    // SPA 특성상 동일 DOM 요소가 다른 영상에 재사용될 수 있으므로 videoId 비교
     if (existing.dataset.videoId !== videoInfo.videoId) {
       existing.remove();
       itemCheckboxMap.delete(item);
