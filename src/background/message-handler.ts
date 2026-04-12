@@ -117,8 +117,7 @@ export function registerMessageHandler(): void {
       case "CLEAR_TEMP_LIST":
         handleAsync(sendResponse, async () => {
           await clearTempList();
-          const list = await getTempList();
-          sendResponse({ success: true, list });
+          sendResponse({ success: true, list: [] });
         });
         return true;
 
@@ -150,20 +149,27 @@ export function registerMessageHandler(): void {
           );
 
           // 2. tempList 조회 후 영상 순차 추가
+          // YouTube API Rate Limit을 고려해 순차 실행 유지
           const tempItems = await getTempList();
-          for (const video of tempItems) {
-            await addItemToPlaylist(playlist.id, video.videoId);
+          try {
+            for (const video of tempItems) {
+              await addItemToPlaylist(playlist.id, video.videoId);
+            }
+          } catch (error) {
+            // 3. 영상 추가 실패 시 생성된 재생목록 롤백
+            await deletePlaylist(playlist.id);
+            throw error;
           }
 
-          // 3. tempList 초기화
+          // 4. tempList 초기화
           await clearTempList();
 
-          // 4. 재생목록 캐시 갱신
+          // 5. 재생목록 캐시 갱신
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
 
-          const list = await getTempList();
-          sendResponse({ success: true, playlist, playlists, list });
+          // ✅ clearTempList 후 항상 빈 배열 → getTempList 재호출 불필요
+          sendResponse({ success: true, playlist, playlists, list: [] });
         });
         return true;
       }

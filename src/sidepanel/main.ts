@@ -9,7 +9,6 @@ const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
 const userInfo = document.getElementById("user-info") as HTMLParagraphElement;
 const tempListContainer = document.getElementById("temp-list-container") as HTMLDivElement;
 
-// 재생목록 생성 폼 요소
 const playlistTitleInput = document.getElementById("playlist-title") as HTMLInputElement;
 const playlistDescriptionInput = document.getElementById("playlist-description") as HTMLTextAreaElement;
 const playlistPrivacySelect = document.getElementById("playlist-privacy") as HTMLSelectElement;
@@ -17,8 +16,11 @@ const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTML
 
 const tempList = new TempList(tempListContainer);
 
-function updateCreateBtn(list: VideoItem[]): void {
-  const hasVideos = list.length > 0;
+// ✅ tempList 로컬 상태 관리 - sendMessage 없이 버튼 상태 갱신
+let currentTempList: VideoItem[] = [];
+
+function updateCreateBtn(): void {
+  const hasVideos = currentTempList.length > 0;
   const hasTitle = playlistTitleInput.value.trim().length > 0;
   createPlaylistBtn.disabled = !hasVideos || !hasTitle;
 }
@@ -27,9 +29,9 @@ async function loadTempList(): Promise<void> {
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
     if (response.success) {
-      const list = response.list as VideoItem[];
-      tempList.render(list);
-      updateCreateBtn(list);
+      currentTempList = response.list as VideoItem[];
+      tempList.render(currentTempList);
+      updateCreateBtn();
     }
   } catch (error) {
     console.error("[YT Playlist Manager] tempList 로드 실패:", error);
@@ -66,21 +68,14 @@ function resetForm(): void {
   playlistTitleInput.value = "";
   playlistDescriptionInput.value = "";
   playlistPrivacySelect.value = "private";
-  createPlaylistBtn.disabled = true;
+  updateCreateBtn();
 }
 
-playlistTitleInput.addEventListener("input", async () => {
-  try {
-    const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
-    if (response.success) {
-      updateCreateBtn(response.list as VideoItem[]);
-    }
-  } catch (error) {
-    console.error("[YT Playlist Manager] tempList 조회 실패:", error);
-  }
+// ✅ sendMessage 없이 로컬 변수로 버튼 상태 갱신
+playlistTitleInput.addEventListener("input", () => {
+  updateCreateBtn();
 });
 
-// 재생목록 생성 버튼 클릭
 createPlaylistBtn.addEventListener("click", async () => {
   const title = playlistTitleInput.value.trim();
   const description = playlistDescriptionInput.value.trim();
@@ -124,9 +119,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 
   if ("tempList" in changes) {
-    const list = (changes.tempList.newValue as VideoItem[]) ?? [];
-    tempList.render(list);
-    updateCreateBtn(list);
+    // ✅ storage.onChanged로 로컬 변수 동기화
+    currentTempList = (changes.tempList.newValue as VideoItem[]) ?? [];
+    tempList.render(currentTempList);
+    updateCreateBtn();
   }
 });
 
