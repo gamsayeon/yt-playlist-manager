@@ -27,6 +27,12 @@ type SendResponse = (response: {
   error?: string;
 }) => void;
 
+const VALID_PRIVACY_STATUSES: PrivacyStatus[] = ["public", "unlisted", "private"];
+
+function isValidPrivacyStatus(value: unknown): value is PrivacyStatus {
+  return VALID_PRIVACY_STATUSES.includes(value as PrivacyStatus);
+}
+
 function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id;
 }
@@ -140,8 +146,14 @@ export function registerMessageHandler(): void {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
+
+        // ✅ privacyStatus 허용값 검증 후 fallback
+        const validatedPrivacyStatus: PrivacyStatus = isValidPrivacyStatus(privacyStatus)
+          ? privacyStatus
+          : "private";
+
         handleAsync(sendResponse, async () => {
-          // ✅ tempList 비어있으면 재생목록 생성 전에 차단
+          // tempList 비어있으면 재생목록 생성 전에 차단
           const tempItems = await getTempList();
           if (tempItems.length === 0) {
             throw new Error("재생목록에 추가할 영상이 없습니다.");
@@ -151,7 +163,7 @@ export function registerMessageHandler(): void {
           const playlist = await createPlaylist(
             title,
             description ?? "",
-            (privacyStatus ?? "private") as PrivacyStatus
+            validatedPrivacyStatus
           );
 
           // 2. 영상 순차 추가 (YouTube API Rate Limit 고려)
@@ -160,9 +172,13 @@ export function registerMessageHandler(): void {
               await addItemToPlaylist(playlist.id, video.videoId);
             }
           } catch (error) {
-            // 3. 영상 추가 실패 시 생성된 재생목록 롤백
-            await deletePlaylist(playlist.id);
-            throw error;
+            // 3. 영상 추가 실패 시 롤백 - 원본 에러 보존
+            try {
+              await deletePlaylist(playlist.id);
+            } catch (rollbackError) {
+              console.error("[YTPM] 재생목록 롤백 실패:", rollbackError);
+            }
+            throw error; // 원본 에러 전달
           }
 
           // 4. tempList 초기화
