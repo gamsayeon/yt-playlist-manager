@@ -1,8 +1,8 @@
 import { clearTempList } from "./storage";
 
 const STORAGE_KEY = "userId";
+const DISPLAY_NAME_KEY = "displayName";
 
-/** Access Token 획득 */
 export async function getAuthToken(interactive: boolean): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive }, (token) => {
@@ -15,7 +15,6 @@ export async function getAuthToken(interactive: boolean): Promise<string> {
   });
 }
 
-/** Access Token 강제 갱신 */
 export async function refreshAuthToken(expiredToken?: string): Promise<string> {
   const tokenToRemove = expiredToken ?? (await getAuthToken(false));
 
@@ -32,10 +31,13 @@ export async function refreshAuthToken(expiredToken?: string): Promise<string> {
   return getAuthToken(false);
 }
 
-/** YouTube 채널 ID 조회 */
-async function fetchUserId(token: string, isRetry = false): Promise<string> {
+/** YouTube 채널 정보 조회 (id + 채널명) */
+async function fetchUserInfo(
+  token: string,
+  isRetry = false
+): Promise<{ userId: string; displayName: string }> {
   const response = await fetch(
-    "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
+    "https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true",
     {
       headers: { Authorization: `Bearer ${token}` },
     }
@@ -43,7 +45,7 @@ async function fetchUserId(token: string, isRetry = false): Promise<string> {
 
   if (response.status === 401 && !isRetry) {
     const newToken = await refreshAuthToken(token);
-    return fetchUserId(newToken, true);
+    return fetchUserInfo(newToken, true);
   }
 
   if (!response.ok) {
@@ -51,21 +53,27 @@ async function fetchUserId(token: string, isRetry = false): Promise<string> {
   }
 
   const data = await response.json();
-  const userId = data.items?.[0]?.id;
+  const channel = data.items?.[0];
 
-  if (!userId) {
-    throw new Error("채널 ID를 찾을 수 없습니다.");
+  if (!channel) {
+    throw new Error("채널 정보를 찾을 수 없습니다.");
   }
 
-  return userId;
+  return {
+    userId: channel.id,
+    displayName: channel.snippet.title,
+  };
 }
 
 /** 로그인 */
 export async function login(): Promise<string> {
   const token = await getAuthToken(true);
-  const userId = await fetchUserId(token);
+  const { userId, displayName } = await fetchUserInfo(token);
 
-  await chrome.storage.local.set({ [STORAGE_KEY]: userId });
+  await chrome.storage.local.set({
+    [STORAGE_KEY]: userId,
+    [DISPLAY_NAME_KEY]: displayName,
+  });
 
   return userId;
 }
@@ -86,7 +94,6 @@ export async function logout(): Promise<void> {
     });
   }
 
-  await chrome.storage.local.remove(STORAGE_KEY);
-  // 로그아웃 시 tempList 초기화
+  await chrome.storage.local.remove([STORAGE_KEY, DISPLAY_NAME_KEY]);
   await clearTempList();
 }
