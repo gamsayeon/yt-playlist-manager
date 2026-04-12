@@ -25,28 +25,65 @@ const tempList = new TempList(tempListContainer);
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
 
-// ✅ mainView가 보인 후 호출해야 정확한 높이 계산 가능
-function applyInitialHeight(): void {
-  const PLAYLIST_INITIAL_HEIGHT = (41 + 4) * 3 + 40;
+// ✅ 매직 넘버 상수화
+const PLAYLIST_ITEM_HEIGHT = 41;  // 재생목록 아이템 높이
+const PLAYLIST_ITEM_GAP = 4;      // 아이템 간격
+const PLAYLIST_HEADER_HEIGHT = 40; // 재생목록 섹션 헤더 높이
+const BODY_PADDING = 32;           // body padding 상하 합계 (16px * 2)
+const MIN_SECTION_HEIGHT = 80;     // 섹션 최소 높이
+const PLAYLIST_INITIAL_HEIGHT =
+  (PLAYLIST_ITEM_HEIGHT + PLAYLIST_ITEM_GAP) * 3 + PLAYLIST_HEADER_HEIGHT;
 
+function calculateHeights(availableHeight: number): {
+  tempHeight: number;
+  playlistHeight: number;
+} {
+  const playlistHeight = Math.max(
+    MIN_SECTION_HEIGHT,
+    Math.min(PLAYLIST_INITIAL_HEIGHT, availableHeight * 0.4)
+  );
+  const tempHeight = Math.max(MIN_SECTION_HEIGHT, availableHeight - playlistHeight);
+  return { tempHeight, playlistHeight };
+}
+
+function applyHeight(tempHeight: number, playlistHeight: number): void {
+  tempSection.style.flex = "none";
+  tempSection.style.height = `${tempHeight}px`;
+  playlistSection.style.flex = "none";
+  playlistSection.style.height = `${playlistHeight}px`;
+}
+
+// ✅ mainView가 보인 후 호출 + resize 이벤트 대응
+function applyInitialHeight(): void {
   requestAnimationFrame(() => {
     const mainHeight = mainView.getBoundingClientRect().height;
     const headerHeight =
       document.getElementById("header-section")!.getBoundingClientRect().height;
     const dividerHeight = divider.getBoundingClientRect().height;
-    const availableHeight = mainHeight - headerHeight - dividerHeight - 16;
+    const availableHeight = mainHeight - headerHeight - dividerHeight - BODY_PADDING;
 
-    const playlistHeight = Math.min(PLAYLIST_INITIAL_HEIGHT, availableHeight * 0.4);
-    const tempHeight = availableHeight - playlistHeight;
-
-    tempSection.style.flex = "none";
-    tempSection.style.height = `${tempHeight}px`;
-    playlistSection.style.flex = "none";
-    playlistSection.style.height = `${playlistHeight}px`;
+    const { tempHeight, playlistHeight } = calculateHeights(availableHeight);
+    applyHeight(tempHeight, playlistHeight);
   });
 }
 
-// ✅ 구분선 드래그 로직
+// ✅ 창 크기 변경 시 높이 재계산
+function initResizeHandler(): void {
+  window.addEventListener("resize", () => {
+    // 드래그로 수동 조절한 경우 재계산하지 않음
+    if (tempSection.style.height && playlistSection.style.height) {
+      const mainHeight = mainView.getBoundingClientRect().height;
+      const headerHeight =
+        document.getElementById("header-section")!.getBoundingClientRect().height;
+      const dividerHeight = divider.getBoundingClientRect().height;
+      const availableHeight = mainHeight - headerHeight - dividerHeight - BODY_PADDING;
+
+      const { tempHeight, playlistHeight } = calculateHeights(availableHeight);
+      applyHeight(tempHeight, playlistHeight);
+    }
+  });
+}
+
 function initDivider(): void {
   let isDragging = false;
   let startY = 0;
@@ -70,7 +107,7 @@ function initDivider(): void {
     const newTempHeight = startTempHeight + delta;
     const newPlaylistHeight = startPlaylistHeight - delta;
 
-    if (newTempHeight < 80 || newPlaylistHeight < 80) return;
+    if (newTempHeight < MIN_SECTION_HEIGHT || newPlaylistHeight < MIN_SECTION_HEIGHT) return;
 
     tempSection.style.height = `${newTempHeight}px`;
     playlistSection.style.height = `${newPlaylistHeight}px`;
@@ -171,7 +208,6 @@ async function showMainView(userId: string): Promise<void> {
   loginView.classList.add("hidden");
   mainView.classList.remove("hidden");
 
-  // ✅ hidden 제거 후 높이 계산
   applyInitialHeight();
 
   const { displayName } = await chrome.storage.local.get("displayName");
@@ -192,6 +228,7 @@ async function init(): Promise<void> {
   mainView.classList.add("hidden");
 
   initDivider();
+  initResizeHandler();
 
   try {
     const { userId } = await chrome.storage.local.get("userId");
