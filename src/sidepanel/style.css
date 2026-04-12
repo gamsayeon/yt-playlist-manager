@@ -11,6 +11,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #app {
@@ -22,7 +23,7 @@ body {
 
 h1 {
   font-size: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 
@@ -33,6 +34,13 @@ button {
   font-size: 14px;
 }
 
+/* 로그인 뷰 */
+#login-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 #login-btn {
   width: 100%;
   padding: 10px;
@@ -40,39 +48,53 @@ button {
   color: white;
 }
 
-#logout-btn {
-  width: 100%;
-  padding: 10px;
-  background-color: #f1f1f1;
-  color: #333;
+/* 메인 뷰 - ✅ height: 100% → flex: 1; min-height: 0 */
+#main-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 헤더 영역 */
+#header-section {
   flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 #user-info {
   font-size: 13px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: #555;
-  flex-shrink: 0;
+}
+
+#logout-btn {
+  width: 100%;
+  padding: 8px;
+  background-color: #f1f1f1;
+  color: #333;
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
-/* main-view */
-#main-view {
+/* 임시 리스트 영역 */
+#temp-section {
+  flex: 2;
+  min-height: 80px;
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow: hidden;
+  padding-bottom: 8px;
 }
 
-/* TempList */
 #temp-list-container {
-  margin-top: 16px;
-  overflow-y: auto;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  margin-bottom: 8px;
 }
 
 .temp-list-empty {
@@ -155,21 +177,20 @@ button {
 
 /* 재생목록 생성 폼 */
 #create-playlist-form {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
   flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
 }
 
 .form-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: #333;
 }
 
 .form-field {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .form-label {
@@ -204,13 +225,13 @@ button {
 }
 
 .form-textarea {
-  resize: vertical;
-  min-height: 60px;
+  resize: none;
+  height: 52px;
 }
 
 .create-playlist-btn {
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   background-color: #4285f4;
   color: white;
   font-size: 13px;
@@ -224,4 +245,107 @@ button {
 .create-playlist-btn:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+}
+
+/* 드래그 구분선 */
+#divider {
+  flex-shrink: 0;
+  height: 6px;
+  background-color: #ddd;
+  cursor: row-resize;
+  border-radius: 3px;
+  margin: 4px 0;
+  transition: background-color 0.2s;
+}
+
+#divider:hover,
+#divider.dragging {
+  background-color: #4285f4;
+}
+
+/* 재생목록 목록 영역 */
+#playlist-section {
+  flex: 1;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  overflow: hidden;
+}
+
+.playlist-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.refresh-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  color: #555;
+  font-size: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background-color: #f1f1f1;
+  color: #333;
+}
+
+.refresh-btn:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+#playlist-list-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.playlist-empty {
+  font-size: 13px;
+  color: #999;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.playlist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.playlist-item:hover {
+  background-color: #f9f9f9;
+}
+
+.playlist-item-title {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-item-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #999;
 }

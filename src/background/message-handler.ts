@@ -6,6 +6,7 @@ import {
   clearTempList,
   getCachedPlaylists,
   setCachedPlaylists,
+  invalidatePlaylists,
   Playlist,
 } from "./storage";
 import {
@@ -140,6 +141,16 @@ export function registerMessageHandler(): void {
         });
         return true;
 
+      // ✅ 캐시 무효화 후 강제 재조회
+      case "REFRESH_PLAYLISTS":
+        handleAsync(sendResponse, async () => {
+          await invalidatePlaylists();
+          const playlists: Playlist[] = await getPlaylists();
+          await setCachedPlaylists(playlists);
+          sendResponse({ success: true, playlists });
+        });
+        return true;
+
       case "CREATE_PLAYLIST": {
         const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
@@ -147,13 +158,11 @@ export function registerMessageHandler(): void {
           return true;
         }
 
-        // ✅ privacyStatus 허용값 검증 후 fallback
         const validatedPrivacyStatus: PrivacyStatus = isValidPrivacyStatus(privacyStatus)
           ? privacyStatus
           : "private";
 
         handleAsync(sendResponse, async () => {
-          // tempList 비어있으면 재생목록 생성 전에 차단
           const tempItems = await getTempList();
           if (tempItems.length === 0) {
             throw new Error("재생목록에 추가할 영상이 없습니다.");
@@ -178,7 +187,7 @@ export function registerMessageHandler(): void {
             } catch (rollbackError) {
               console.error("[YTPM] 재생목록 롤백 실패:", rollbackError);
             }
-            throw error; // 원본 에러 전달
+            throw error;
           }
 
           // 4. tempList 초기화
