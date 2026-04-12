@@ -25,14 +25,18 @@ const tempList = new TempList(tempListContainer);
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
 
-// ✅ 매직 넘버 상수화
-const PLAYLIST_ITEM_HEIGHT = 41;  // 재생목록 아이템 높이
-const PLAYLIST_ITEM_GAP = 4;      // 아이템 간격
-const PLAYLIST_HEADER_HEIGHT = 40; // 재생목록 섹션 헤더 높이
-const BODY_PADDING = 32;           // body padding 상하 합계 (16px * 2)
-const MIN_SECTION_HEIGHT = 80;     // 섹션 최소 높이
+// 상수 정의
+const PLAYLIST_ITEM_HEIGHT = 41;
+const PLAYLIST_ITEM_GAP = 4;
+const PLAYLIST_HEADER_HEIGHT = 40;
+const MIN_SECTION_HEIGHT = 80;
 const PLAYLIST_INITIAL_HEIGHT =
   (PLAYLIST_ITEM_HEIGHT + PLAYLIST_ITEM_GAP) * 3 + PLAYLIST_HEADER_HEIGHT;
+
+// 드래그로 수동 조절했는지 여부 추적
+let isDraggedManually = false;
+// 드래그 후 사용자가 설정한 비율 저장
+let userTempRatio = 0;
 
 function calculateHeights(availableHeight: number): {
   tempHeight: number;
@@ -53,31 +57,41 @@ function applyHeight(tempHeight: number, playlistHeight: number): void {
   playlistSection.style.height = `${playlistHeight}px`;
 }
 
-// ✅ mainView가 보인 후 호출 + resize 이벤트 대응
+function getAvailableHeight(): number {
+  const mainHeight = mainView.getBoundingClientRect().height;
+  const headerHeight =
+    document.getElementById("header-section")!.getBoundingClientRect().height;
+  const dividerHeight = divider.getBoundingClientRect().height;
+  // ✅ BODY_PADDING 제거 - mainView는 이미 padding 내부에 위치
+  return mainHeight - headerHeight - dividerHeight;
+}
+
 function applyInitialHeight(): void {
   requestAnimationFrame(() => {
-    const mainHeight = mainView.getBoundingClientRect().height;
-    const headerHeight =
-      document.getElementById("header-section")!.getBoundingClientRect().height;
-    const dividerHeight = divider.getBoundingClientRect().height;
-    const availableHeight = mainHeight - headerHeight - dividerHeight - BODY_PADDING;
-
+    const availableHeight = getAvailableHeight();
     const { tempHeight, playlistHeight } = calculateHeights(availableHeight);
     applyHeight(tempHeight, playlistHeight);
   });
 }
 
-// ✅ 창 크기 변경 시 높이 재계산
+// ✅ resize 시 드래그 비율 유지
 function initResizeHandler(): void {
   window.addEventListener("resize", () => {
-    // 드래그로 수동 조절한 경우 재계산하지 않음
-    if (tempSection.style.height && playlistSection.style.height) {
-      const mainHeight = mainView.getBoundingClientRect().height;
-      const headerHeight =
-        document.getElementById("header-section")!.getBoundingClientRect().height;
-      const dividerHeight = divider.getBoundingClientRect().height;
-      const availableHeight = mainHeight - headerHeight - dividerHeight - BODY_PADDING;
+    const availableHeight = getAvailableHeight();
 
+    if (isDraggedManually && userTempRatio > 0) {
+      // 드래그로 조절한 비율 유지
+      const newTempHeight = Math.max(
+        MIN_SECTION_HEIGHT,
+        Math.round(availableHeight * userTempRatio)
+      );
+      const newPlaylistHeight = Math.max(
+        MIN_SECTION_HEIGHT,
+        availableHeight - newTempHeight
+      );
+      applyHeight(newTempHeight, newPlaylistHeight);
+    } else {
+      // 초기 비율로 재계산
       const { tempHeight, playlistHeight } = calculateHeights(availableHeight);
       applyHeight(tempHeight, playlistHeight);
     }
@@ -119,6 +133,15 @@ function initDivider(): void {
     divider.classList.remove("dragging");
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
+
+    // ✅ 드래그 완료 후 사용자 비율 저장
+    const totalHeight =
+      tempSection.getBoundingClientRect().height +
+      playlistSection.getBoundingClientRect().height;
+    if (totalHeight > 0) {
+      isDraggedManually = true;
+      userTempRatio = tempSection.getBoundingClientRect().height / totalHeight;
+    }
   });
 }
 
@@ -202,6 +225,8 @@ function showLoginView(): void {
   userInfo.textContent = "";
   playlistListContainer.innerHTML = "";
   currentTempList = [];
+  isDraggedManually = false;
+  userTempRatio = 0;
 }
 
 async function showMainView(userId: string): Promise<void> {
@@ -313,11 +338,10 @@ loginBtn.addEventListener("click", async () => {
       type: "LOGIN",
     });
 
-    if (response.success) {
-      await showMainView(response.userId as string);
-    } else {
+    if (!response.success) {
       alert(`로그인 실패: ${response.error}`);
     }
+    // ✅ storage.onChanged에서 showMainView 호출하므로 직접 호출 제거
   } catch (error) {
     alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -335,11 +359,10 @@ logoutBtn.addEventListener("click", async () => {
       type: "LOGOUT",
     });
 
-    if (response.success) {
-      showLoginView();
-    } else {
+    if (!response.success) {
       alert(`로그아웃 실패: ${response.error}`);
     }
+    // ✅ storage.onChanged에서 showLoginView 호출하므로 직접 호출 제거
   } catch (error) {
     alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
   } finally {

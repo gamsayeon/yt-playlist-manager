@@ -48,11 +48,12 @@ button {
   color: white;
 }
 
-/* 메인 뷰 */
+/* 메인 뷰 - ✅ height: 100% → flex: 1; min-height: 0 */
 #main-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -79,7 +80,7 @@ button {
   display: none !important;
 }
 
-/* 임시 리스트 영역 - CSS 기본값 flex: 2, JS 드래그 후 height로 전환 */
+/* 임시 리스트 영역 */
 #temp-section {
   flex: 2;
   min-height: 80px;
@@ -262,7 +263,7 @@ button {
   background-color: #4285f4;
 }
 
-/* 재생목록 목록 영역 - CSS 기본값 flex: 1, JS 드래그 후 height로 전환 */
+/* 재생목록 목록 영역 */
 #playlist-section {
   flex: 1;
   min-height: 80px;
