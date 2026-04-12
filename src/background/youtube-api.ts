@@ -38,6 +38,9 @@ interface YouTubePlaylistSingleResponse {
   };
 }
 
+/** 공개 여부 타입 */
+export type PrivacyStatus = "public" | "unlisted" | "private";
+
 /** 인증된 fetch 요청 (401 시 토큰 재발급 후 1회 재시도, 403 시 Quota 안내) */
 async function fetchWithAuth(
   url: string,
@@ -100,12 +103,18 @@ export async function getPlaylists(): Promise<Playlist[]> {
 }
 
 /** 재생목록 생성 */
-export async function createPlaylist(title: string): Promise<Playlist> {
-  const url = `${BASE_URL}/playlists?part=snippet,contentDetails`;
+export async function createPlaylist(
+  title: string,
+  description: string = "",
+  privacyStatus: PrivacyStatus = "private"
+): Promise<Playlist> {
+  // ✅ contentDetails 제거 - 읽기 전용이라 insert 시 400 오류 발생
+  const url = `${BASE_URL}/playlists?part=snippet,status`;
   const response = await fetchWithAuth(url, {
     method: "POST",
     body: JSON.stringify({
-      snippet: { title },
+      snippet: { title, description },
+      status: { privacyStatus },
     }),
   });
   const data: YouTubePlaylistSingleResponse = await response.json();

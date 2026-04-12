@@ -16,6 +16,46 @@
         <p id="user-info"></p>
         <button id="logout-btn">로그아웃</button>
         <div id="temp-list-container"></div>
+
+        <!-- 재생목록 생성 폼 -->
+        <div id="create-playlist-form">
+          <h2 class="form-title">재생목록 생성</h2>
+
+          <div class="form-field">
+            <label class="form-label" for="playlist-title">제목 <span class="form-required">*</span></label>
+            <input
+              type="text"
+              id="playlist-title"
+              class="form-input"
+              placeholder="재생목록 제목을 입력하세요"
+              maxlength="150"
+            />
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="playlist-description">설명</label>
+            <textarea
+              id="playlist-description"
+              class="form-textarea"
+              placeholder="재생목록 설명을 입력하세요 (선택)"
+              maxlength="5000"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="playlist-privacy">공개 여부</label>
+            <select id="playlist-privacy" class="form-select">
+              <option value="public">공개</option>
+              <option value="unlisted">미등록</option>
+              <option value="private" selected>비공개</option>
+            </select>
+          </div>
+
+          <button id="create-playlist-btn" class="create-playlist-btn" disabled>
+            재생목록 생성
+          </button>
+        </div>
       </div>
     </div>
     <script type="module" src="./main.ts"></script>

@@ -9,13 +9,29 @@ const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
 const userInfo = document.getElementById("user-info") as HTMLParagraphElement;
 const tempListContainer = document.getElementById("temp-list-container") as HTMLDivElement;
 
+const playlistTitleInput = document.getElementById("playlist-title") as HTMLInputElement;
+const playlistDescriptionInput = document.getElementById("playlist-description") as HTMLTextAreaElement;
+const playlistPrivacySelect = document.getElementById("playlist-privacy") as HTMLSelectElement;
+const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTMLButtonElement;
+
 const tempList = new TempList(tempListContainer);
+
+// ✅ tempList 로컬 상태 관리 - sendMessage 없이 버튼 상태 갱신
+let currentTempList: VideoItem[] = [];
+
+function updateCreateBtn(): void {
+  const hasVideos = currentTempList.length > 0;
+  const hasTitle = playlistTitleInput.value.trim().length > 0;
+  createPlaylistBtn.disabled = !hasVideos || !hasTitle;
+}
 
 async function loadTempList(): Promise<void> {
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_TEMP_LIST" });
     if (response.success) {
-      tempList.render(response.list as VideoItem[]);
+      currentTempList = response.list as VideoItem[];
+      tempList.render(currentTempList);
+      updateCreateBtn();
     }
   } catch (error) {
     console.error("[YT Playlist Manager] tempList 로드 실패:", error);
@@ -25,7 +41,6 @@ async function loadTempList(): Promise<void> {
 async function init(): Promise<void> {
   try {
     const { userId } = await chrome.storage.local.get("userId");
-
     if (userId) {
       showMainView(userId);
     } else {
@@ -49,6 +64,48 @@ function showMainView(userId: string): void {
   loadTempList();
 }
 
+function resetForm(): void {
+  playlistTitleInput.value = "";
+  playlistDescriptionInput.value = "";
+  playlistPrivacySelect.value = "private";
+  updateCreateBtn();
+}
+
+// ✅ sendMessage 없이 로컬 변수로 버튼 상태 갱신
+playlistTitleInput.addEventListener("input", () => {
+  updateCreateBtn();
+});
+
+createPlaylistBtn.addEventListener("click", async () => {
+  const title = playlistTitleInput.value.trim();
+  const description = playlistDescriptionInput.value.trim();
+  const privacyStatus = playlistPrivacySelect.value;
+
+  if (!title) return;
+
+  try {
+    createPlaylistBtn.disabled = true;
+    createPlaylistBtn.textContent = "생성 중...";
+
+    const response: MessageResponse = await chrome.runtime.sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: { title, description, privacyStatus },
+    });
+
+    if (response.success) {
+      resetForm();
+    } else {
+      alert(`재생목록 생성 실패: ${response.error}`);
+      createPlaylistBtn.disabled = false;
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+    createPlaylistBtn.disabled = false;
+  } finally {
+    createPlaylistBtn.textContent = "재생목록 생성";
+  }
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
 
@@ -61,10 +118,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
   }
 
-  // Content Script에서 체크/해제 시 실시간 갱신
   if ("tempList" in changes) {
-    const list = (changes.tempList.newValue as VideoItem[]) ?? [];
-    tempList.render(list);
+    // ✅ storage.onChanged로 로컬 변수 동기화
+    currentTempList = (changes.tempList.newValue as VideoItem[]) ?? [];
+    tempList.render(currentTempList);
+    updateCreateBtn();
   }
 });
 

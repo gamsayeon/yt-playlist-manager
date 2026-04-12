@@ -14,6 +14,7 @@ import {
   deletePlaylist,
   addItemToPlaylist,
   removeItemFromPlaylist,
+  PrivacyStatus,
 } from "./youtube-api";
 import { login, logout } from "./auth";
 
@@ -25,6 +26,12 @@ type SendResponse = (response: {
   playlist?: Playlist;
   error?: string;
 }) => void;
+
+const VALID_PRIVACY_STATUSES: PrivacyStatus[] = ["public", "unlisted", "private"];
+
+function isValidPrivacyStatus(value: unknown): value is PrivacyStatus {
+  return VALID_PRIVACY_STATUSES.includes(value as PrivacyStatus);
+}
 
 function isInternalSender(sender: chrome.runtime.MessageSender): boolean {
   return sender.id === chrome.runtime.id;
@@ -116,8 +123,7 @@ export function registerMessageHandler(): void {
       case "CLEAR_TEMP_LIST":
         handleAsync(sendResponse, async () => {
           await clearTempList();
-          const list = await getTempList();
-          sendResponse({ success: true, list });
+          sendResponse({ success: true, list: [] });
         });
         return true;
 
@@ -135,18 +141,54 @@ export function registerMessageHandler(): void {
         return true;
 
       case "CREATE_PLAYLIST": {
-        const title = message.payload?.title;
+        const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
+
+        // ✅ privacyStatus 허용값 검증 후 fallback
+        const validatedPrivacyStatus: PrivacyStatus = isValidPrivacyStatus(privacyStatus)
+          ? privacyStatus
+          : "private";
+
         handleAsync(sendResponse, async () => {
-          const playlist = await createPlaylist(title);
+          // tempList 비어있으면 재생목록 생성 전에 차단
+          const tempItems = await getTempList();
+          if (tempItems.length === 0) {
+            throw new Error("재생목록에 추가할 영상이 없습니다.");
+          }
+
+          // 1. 재생목록 생성
+          const playlist = await createPlaylist(
+            title,
+            description ?? "",
+            validatedPrivacyStatus
+          );
+
+          // 2. 영상 순차 추가 (YouTube API Rate Limit 고려)
+          try {
+            for (const video of tempItems) {
+              await addItemToPlaylist(playlist.id, video.videoId);
+            }
+          } catch (error) {
+            // 3. 영상 추가 실패 시 롤백 - 원본 에러 보존
+            try {
+              await deletePlaylist(playlist.id);
+            } catch (rollbackError) {
+              console.error("[YTPM] 재생목록 롤백 실패:", rollbackError);
+            }
+            throw error; // 원본 에러 전달
+          }
+
+          // 4. tempList 초기화
           await clearTempList();
+
+          // 5. 재생목록 캐시 갱신
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
-          const list = await getTempList();
-          sendResponse({ success: true, playlist, playlists, list });
+
+          sendResponse({ success: true, playlist, playlists, list: [] });
         });
         return true;
       }
