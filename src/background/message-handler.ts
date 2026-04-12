@@ -141,7 +141,6 @@ export function registerMessageHandler(): void {
         });
         return true;
 
-      // ✅ 캐시 무효화 후 강제 재조회
       case "REFRESH_PLAYLISTS":
         handleAsync(sendResponse, async () => {
           await invalidatePlaylists();
@@ -168,20 +167,17 @@ export function registerMessageHandler(): void {
             throw new Error("재생목록에 추가할 영상이 없습니다.");
           }
 
-          // 1. 재생목록 생성
           const playlist = await createPlaylist(
             title,
             description ?? "",
             validatedPrivacyStatus
           );
 
-          // 2. 영상 순차 추가 (YouTube API Rate Limit 고려)
           try {
             for (const video of tempItems) {
               await addItemToPlaylist(playlist.id, video.videoId);
             }
           } catch (error) {
-            // 3. 영상 추가 실패 시 롤백 - 원본 에러 보존
             try {
               await deletePlaylist(playlist.id);
             } catch (rollbackError) {
@@ -190,10 +186,8 @@ export function registerMessageHandler(): void {
             throw error;
           }
 
-          // 4. tempList 초기화
           await clearTempList();
 
-          // 5. 재생목록 캐시 갱신
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
 
@@ -212,6 +206,36 @@ export function registerMessageHandler(): void {
           () => deletePlaylist(playlistId),
           sendResponse
         );
+        return true;
+      }
+
+      // ✅ 기존 재생목록에 tempList 영상 일괄 추가
+      case "ADD_TEMP_TO_PLAYLIST": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const tempItems = await getTempList();
+          if (tempItems.length === 0) {
+            throw new Error("추가할 영상이 없습니다.");
+          }
+
+          // 영상 순차 추가 (YouTube API Rate Limit 고려)
+          for (const video of tempItems) {
+            await addItemToPlaylist(playlistId, video.videoId);
+          }
+
+          // tempList 초기화
+          await clearTempList();
+
+          // 캐시 갱신
+          const playlists = await getPlaylists();
+          await setCachedPlaylists(playlists);
+
+          sendResponse({ success: true, playlists, list: [] });
+        });
         return true;
       }
 

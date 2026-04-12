@@ -48,7 +48,7 @@ button {
   color: white;
 }
 
-/* 메인 뷰 - ✅ height: 100% → flex: 1; min-height: 0 */
+/* 메인 뷰 */
 #main-view {
   display: flex;
   flex-direction: column;
@@ -348,4 +348,28 @@ button {
   flex-shrink: 0;
   font-size: 11px;
   color: #999;
+}
+
+/* 재생목록 임시 추가 버튼 */
+.playlist-item-add-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background-color: #4285f4;
+  color: white;
+  font-size: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playlist-item-add-btn:hover:not(:disabled) {
+  background-color: #3367d6;
+}
+
+.playlist-item-add-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }

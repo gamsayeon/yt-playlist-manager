@@ -16,7 +16,6 @@ const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTML
 
 const playlistListContainer = document.getElementById("playlist-list-container") as HTMLDivElement;
 const refreshPlaylistsBtn = document.getElementById("refresh-playlists-btn") as HTMLButtonElement;
-// ✅ headerSection 캐싱 추가
 const headerSection = document.getElementById("header-section") as HTMLDivElement;
 const divider = document.getElementById("divider") as HTMLDivElement;
 const tempSection = document.getElementById("temp-section") as HTMLDivElement;
@@ -56,7 +55,6 @@ function applyHeight(tempHeight: number, playlistHeight: number): void {
   playlistSection.style.height = `${playlistHeight}px`;
 }
 
-// ✅ 캐싱된 headerSection 사용
 function getAvailableHeight(): number {
   const mainHeight = mainView.getBoundingClientRect().height;
   const headerHeight = headerSection.getBoundingClientRect().height;
@@ -93,7 +91,6 @@ function initResizeHandler(): void {
   });
 }
 
-// ✅ mousemove/mouseup을 mousedown 시 등록, mouseup 시 제거
 function initDivider(): void {
   let startY = 0;
   let startTempHeight = 0;
@@ -146,6 +143,7 @@ function updateCreateBtn(): void {
   createPlaylistBtn.disabled = !hasVideos || !hasTitle;
 }
 
+// ✅ 재생목록 클릭 시 tempList 일괄 추가 버튼 포함 렌더링
 function renderPlaylists(
   playlists: { id: string; title: string; itemCount: number }[]
 ): void {
@@ -173,10 +171,58 @@ function renderPlaylists(
     count.className = "playlist-item-count";
     count.textContent = `${playlist.itemCount}개`;
 
+    // ✅ 임시 리스트 추가 버튼
+    const addBtn = document.createElement("button");
+    addBtn.className = "playlist-item-add-btn";
+    addBtn.textContent = "+";
+    addBtn.title = "임시 리스트 영상 추가";
+    addBtn.disabled = currentTempList.length === 0;
+    addBtn.addEventListener("click", async () => {
+      await handleAddTempToPlaylist(playlist.id, playlist.title, addBtn);
+    });
+
     item.appendChild(title);
     item.appendChild(count);
+    item.appendChild(addBtn);
     playlistListContainer.appendChild(item);
   });
+}
+
+// ✅ 기존 재생목록에 tempList 일괄 추가
+async function handleAddTempToPlaylist(
+  playlistId: string,
+  playlistTitle: string,
+  btn: HTMLButtonElement
+): Promise<void> {
+  if (currentTempList.length === 0) {
+    alert("추가할 영상이 없습니다.");
+    return;
+  }
+
+  if (!confirm(`"${playlistTitle}"에 ${currentTempList.length}개의 영상을 추가할까요?`)) {
+    return;
+  }
+
+  try {
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    const response: MessageResponse = await chrome.runtime.sendMessage({
+      type: "ADD_TEMP_TO_PLAYLIST",
+      payload: { playlistId },
+    });
+
+    if (response.success) {
+      renderPlaylists(response.playlists ?? []);
+    } else {
+      alert(`추가 실패: ${response.error}`);
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btn.textContent = "+";
+    btn.disabled = currentTempList.length === 0;
+  }
 }
 
 async function loadPlaylists(forceRefresh = false): Promise<void> {
@@ -321,6 +367,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     currentTempList = (changes.tempList.newValue as VideoItem[]) ?? [];
     tempList.render(currentTempList);
     updateCreateBtn();
+    // ✅ tempList 변경 시 추가 버튼 활성화 상태 갱신
+    document.querySelectorAll<HTMLButtonElement>(".playlist-item-add-btn").forEach((btn) => {
+      btn.disabled = currentTempList.length === 0;
+    });
   }
 });
 
