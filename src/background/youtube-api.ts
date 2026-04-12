@@ -108,7 +108,8 @@ export async function createPlaylist(
   description: string = "",
   privacyStatus: PrivacyStatus = "private"
 ): Promise<Playlist> {
-  const url = `${BASE_URL}/playlists?part=snippet,contentDetails,status`;
+  // ✅ contentDetails 제거 - 읽기 전용이라 insert 시 400 오류 발생
+  const url = `${BASE_URL}/playlists?part=snippet,status`;
   const response = await fetchWithAuth(url, {
     method: "POST",
     body: JSON.stringify({

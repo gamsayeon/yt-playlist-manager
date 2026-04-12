@@ -141,6 +141,12 @@ export function registerMessageHandler(): void {
           return true;
         }
         handleAsync(sendResponse, async () => {
+          // ✅ tempList 비어있으면 재생목록 생성 전에 차단
+          const tempItems = await getTempList();
+          if (tempItems.length === 0) {
+            throw new Error("재생목록에 추가할 영상이 없습니다.");
+          }
+
           // 1. 재생목록 생성
           const playlist = await createPlaylist(
             title,
@@ -148,9 +154,7 @@ export function registerMessageHandler(): void {
             (privacyStatus ?? "private") as PrivacyStatus
           );
 
-          // 2. tempList 조회 후 영상 순차 추가
-          // YouTube API Rate Limit을 고려해 순차 실행 유지
-          const tempItems = await getTempList();
+          // 2. 영상 순차 추가 (YouTube API Rate Limit 고려)
           try {
             for (const video of tempItems) {
               await addItemToPlaylist(playlist.id, video.videoId);
@@ -168,7 +172,6 @@ export function registerMessageHandler(): void {
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
 
-          // ✅ clearTempList 후 항상 빈 배열 → getTempList 재호출 불필요
           sendResponse({ success: true, playlist, playlists, list: [] });
         });
         return true;
