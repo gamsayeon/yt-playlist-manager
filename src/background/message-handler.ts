@@ -11,11 +11,14 @@ import {
 } from "./storage";
 import {
   getPlaylists,
+  getPlaylistItems,
   createPlaylist,
+  updatePlaylist,
   deletePlaylist,
   addItemToPlaylist,
   removeItemFromPlaylist,
   PrivacyStatus,
+  PlaylistItem,
 } from "./youtube-api";
 import { login, logout } from "./auth";
 
@@ -25,6 +28,7 @@ type SendResponse = (response: {
   list?: VideoItem[];
   playlists?: Playlist[];
   playlist?: Playlist;
+  playlistItems?: PlaylistItem[];
   error?: string;
 }) => void;
 
@@ -150,6 +154,19 @@ export function registerMessageHandler(): void {
         });
         return true;
 
+      case "GET_PLAYLIST_ITEMS": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const playlistItems = await getPlaylistItems(playlistId);
+          sendResponse({ success: true, playlistItems });
+        });
+        return true;
+      }
+
       case "CREATE_PLAYLIST": {
         const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
@@ -196,6 +213,34 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      // ✅ 재생목록 수정
+      case "UPDATE_PLAYLIST": {
+        const { playlistId, title, description, privacyStatus } = message.payload ?? {};
+        if (!playlistId || !title) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+
+        const validatedPrivacyStatus: PrivacyStatus = isValidPrivacyStatus(privacyStatus)
+          ? privacyStatus
+          : "private";
+
+        handleAsync(sendResponse, async () => {
+          const playlist = await updatePlaylist(
+            playlistId,
+            title,
+            description ?? "",
+            validatedPrivacyStatus
+          );
+
+          const playlists = await getPlaylists();
+          await setCachedPlaylists(playlists);
+
+          sendResponse({ success: true, playlist, playlists });
+        });
+        return true;
+      }
+
       case "DELETE_PLAYLIST": {
         const playlistId = message.payload?.playlistId;
         if (!playlistId) {
@@ -209,7 +254,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ 기존 재생목록에 tempList 영상 일괄 추가
       case "ADD_TEMP_TO_PLAYLIST": {
         const { playlistId } = message.payload ?? {};
         if (!playlistId) {
@@ -222,15 +266,12 @@ export function registerMessageHandler(): void {
             throw new Error("추가할 영상이 없습니다.");
           }
 
-          // 영상 순차 추가 (YouTube API Rate Limit 고려)
           for (const video of tempItems) {
             await addItemToPlaylist(playlistId, video.videoId);
           }
 
-          // tempList 초기화
           await clearTempList();
 
-          // 캐시 갱신
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
 
