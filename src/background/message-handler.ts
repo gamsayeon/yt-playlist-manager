@@ -305,7 +305,9 @@ export function registerMessageHandler(): void {
             playlists = cached.filter((p) => p.id !== playlistId);
             await setCachedPlaylists(playlists);
           } else {
-            playlists = await getPlaylists();
+            // ✅ API 최종 일관성 문제 방지 - 조회 후 삭제된 항목 필터링
+            const allPlaylists = await getPlaylists();
+            playlists = allPlaylists.filter((p) => p.id !== playlistId);
             await setCachedPlaylists(playlists);
           }
 

@@ -357,6 +357,8 @@ function renderPlaylists(
     deleteBtn.className = "playlist-item-delete-btn";
     deleteBtn.textContent = "🗑";
     deleteBtn.title = "재생목록 삭제";
+    // ✅ aria-label 추가
+    deleteBtn.setAttribute("aria-label", `"${playlist.title}" 재생목록 삭제`);
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!confirm(`"${playlist.title}" 재생목록을 삭제할까요?\n삭제된 재생목록은 복구할 수 없습니다.`)) {
