@@ -1,5 +1,3 @@
-// src/content/checkbox/search.ts
-
 import type { VideoInfo } from "./types";
 import { injectFixedCheckbox } from "./fixed-checkbox";
 
@@ -14,10 +12,12 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
     const videoId = shortsIdMatch[1];
     const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
     const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
+    const src = imgEl?.src;
+    if (!src) return null;
     return {
       videoId,
       title,
-      thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+      thumbnail: src,
     };
   }
 
@@ -26,10 +26,12 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
     const videoId = videoIdMatch[1];
     const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
     const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
+    const src = imgEl?.src;
+    if (!src) return null;
     return {
       videoId,
       title,
-      thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+      thumbnail: src,
     };
   }
 
@@ -50,11 +52,9 @@ export function parseSearchShortsInfo(item: Element): VideoInfo | null {
     item.querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
       ?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  return { videoId, title, thumbnail };
 }
 
 export function injectSearchCheckbox(item: Element, videoInfo: VideoInfo): void {
