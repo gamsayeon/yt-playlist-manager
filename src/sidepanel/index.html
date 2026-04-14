@@ -20,13 +20,26 @@
           <button id="logout-btn">로그아웃</button>
         </div>
 
-        <!-- 임시 리스트 영역 -->
+        <!-- 임시 리스트 / 재생목록 영상 목록 (같은 공간) -->
         <div id="temp-section">
-          <div id="temp-list-container"></div>
 
-          <!-- 재생목록 생성 폼 -->
-          <div id="create-playlist-form">
-            <h2 class="form-title">재생목록 생성</h2>
+          <!-- 임시 리스트 모드 -->
+          <div id="temp-list-mode">
+            <div id="temp-list-container"></div>
+          </div>
+
+          <!-- 재생목록 수정 모드 -->
+          <div id="playlist-edit-mode" class="hidden">
+            <div id="playlist-edit-header">
+              <button id="back-btn" class="back-btn">← 뒤로</button>
+              <p id="playlist-edit-title" class="playlist-edit-title"></p>
+            </div>
+            <div id="playlist-items-container"></div>
+          </div>
+
+          <!-- 생성/수정 폼 -->
+          <div id="playlist-form">
+            <h2 id="form-title-text" class="form-title">재생목록 생성</h2>
 
             <div class="form-field">
               <label class="form-label" for="playlist-title">제목 <span class="form-required">*</span></label>
@@ -59,7 +72,7 @@
               </select>
             </div>
 
-            <button id="create-playlist-btn" class="create-playlist-btn" disabled>
+            <button id="submit-playlist-btn" class="create-playlist-btn" disabled>
               재생목록 생성
             </button>
           </div>

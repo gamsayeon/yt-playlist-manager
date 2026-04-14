@@ -1,6 +1,7 @@
 import { MessageResponse } from "../types/message";
 import { VideoItem } from "../types";
 import { TempList } from "../components/TempList";
+import { PlaylistItem } from "../background/youtube-api";
 
 const loginView = document.getElementById("login-view") as HTMLDivElement;
 const mainView = document.getElementById("main-view") as HTMLDivElement;
@@ -12,20 +13,35 @@ const tempListContainer = document.getElementById("temp-list-container") as HTML
 const playlistTitleInput = document.getElementById("playlist-title") as HTMLInputElement;
 const playlistDescriptionInput = document.getElementById("playlist-description") as HTMLTextAreaElement;
 const playlistPrivacySelect = document.getElementById("playlist-privacy") as HTMLSelectElement;
-const createPlaylistBtn = document.getElementById("create-playlist-btn") as HTMLButtonElement;
+const submitPlaylistBtn = document.getElementById("submit-playlist-btn") as HTMLButtonElement;
+const formTitleText = document.getElementById("form-title-text") as HTMLHeadingElement;
 
 const playlistListContainer = document.getElementById("playlist-list-container") as HTMLDivElement;
 const refreshPlaylistsBtn = document.getElementById("refresh-playlists-btn") as HTMLButtonElement;
-// ✅ headerSection 캐싱 추가
 const headerSection = document.getElementById("header-section") as HTMLDivElement;
 const divider = document.getElementById("divider") as HTMLDivElement;
 const tempSection = document.getElementById("temp-section") as HTMLDivElement;
 const playlistSection = document.getElementById("playlist-section") as HTMLDivElement;
 
+const tempListMode = document.getElementById("temp-list-mode") as HTMLDivElement;
+const playlistEditMode = document.getElementById("playlist-edit-mode") as HTMLDivElement;
+const playlistEditTitle = document.getElementById("playlist-edit-title") as HTMLParagraphElement;
+const playlistItemsContainer = document.getElementById("playlist-items-container") as HTMLDivElement;
+const backBtn = document.getElementById("back-btn") as HTMLButtonElement;
+
 const tempList = new TempList(tempListContainer);
 
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
+
+let selectedPlaylist: {
+  id: string;
+  title: string;
+  description: string;
+  privacyStatus: string;
+} | null = null;
+
+let pendingRemovals: string[] = [];
 
 const PLAYLIST_ITEM_HEIGHT = 41;
 const PLAYLIST_ITEM_GAP = 4;
@@ -56,7 +72,6 @@ function applyHeight(tempHeight: number, playlistHeight: number): void {
   playlistSection.style.height = `${playlistHeight}px`;
 }
 
-// ✅ 캐싱된 headerSection 사용
 function getAvailableHeight(): number {
   const mainHeight = mainView.getBoundingClientRect().height;
   const headerHeight = headerSection.getBoundingClientRect().height;
@@ -93,7 +108,6 @@ function initResizeHandler(): void {
   });
 }
 
-// ✅ mousemove/mouseup을 mousedown 시 등록, mouseup 시 제거
 function initDivider(): void {
   let startY = 0;
   let startTempHeight = 0;
@@ -140,14 +154,137 @@ function initDivider(): void {
   });
 }
 
-function updateCreateBtn(): void {
-  const hasVideos = currentTempList.length > 0;
-  const hasTitle = playlistTitleInput.value.trim().length > 0;
-  createPlaylistBtn.disabled = !hasVideos || !hasTitle;
+function switchToTempListMode(): void {
+  tempListMode.classList.remove("hidden");
+  playlistEditMode.classList.add("hidden");
+  selectedPlaylist = null;
+  pendingRemovals = [];
+
+  formTitleText.textContent = "재생목록 생성";
+  submitPlaylistBtn.textContent = "재생목록 생성";
+  playlistTitleInput.value = "";
+  playlistDescriptionInput.value = "";
+  playlistPrivacySelect.value = "private";
+  updateSubmitBtn();
+}
+
+function switchToEditMode(playlist: {
+  id: string;
+  title: string;
+  description: string;
+  privacyStatus: string;
+}): void {
+  selectedPlaylist = playlist;
+  pendingRemovals = [];
+  tempListMode.classList.add("hidden");
+  playlistEditMode.classList.remove("hidden");
+
+  playlistEditTitle.textContent = playlist.title;
+
+  formTitleText.textContent = "재생목록 수정";
+  submitPlaylistBtn.textContent = "재생목록 수정";
+  playlistTitleInput.value = playlist.title;
+  playlistDescriptionInput.value = playlist.description;
+  playlistPrivacySelect.value = playlist.privacyStatus;
+  submitPlaylistBtn.disabled = false;
+}
+
+function updateSubmitBtn(): void {
+  if (selectedPlaylist) {
+    submitPlaylistBtn.disabled = playlistTitleInput.value.trim().length === 0;
+  } else {
+    const hasVideos = currentTempList.length > 0;
+    const hasTitle = playlistTitleInput.value.trim().length > 0;
+    submitPlaylistBtn.disabled = !hasVideos || !hasTitle;
+  }
+}
+
+function renderPlaylistItems(items: PlaylistItem[]): void {
+  playlistItemsContainer.innerHTML = "";
+
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "playlist-video-empty";
+    empty.textContent = "영상이 없습니다.";
+    playlistItemsContainer.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "playlist-video-item";
+    row.dataset.playlistItemId = item.playlistItemId;
+
+    if (pendingRemovals.includes(item.playlistItemId)) {
+      row.classList.add("pending-removal");
+    }
+
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "playlist-video-thumbnail";
+    thumbnail.src = item.thumbnail;
+    thumbnail.alt = item.title;
+    thumbnail.addEventListener("error", () => {
+      thumbnail.src = `https://i.ytimg.com/vi/${item.videoId}/mqdefault.jpg`;
+    });
+
+    const title = document.createElement("p");
+    title.className = "playlist-video-title";
+    title.textContent = item.title;
+    title.title = item.title;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "playlist-video-remove-btn";
+    removeBtn.textContent = pendingRemovals.includes(item.playlistItemId) ? "↩" : "✕";
+    removeBtn.setAttribute("aria-label", `${item.title} 제거`);
+
+    removeBtn.addEventListener("click", () => {
+      if (pendingRemovals.includes(item.playlistItemId)) {
+        pendingRemovals = pendingRemovals.filter((id) => id !== item.playlistItemId);
+      } else {
+        pendingRemovals.push(item.playlistItemId);
+      }
+      row.classList.toggle("pending-removal");
+      removeBtn.textContent = pendingRemovals.includes(item.playlistItemId) ? "↩" : "✕";
+    });
+
+    row.appendChild(thumbnail);
+    row.appendChild(title);
+    row.appendChild(removeBtn);
+    playlistItemsContainer.appendChild(row);
+  });
+}
+
+async function loadPlaylistItems(playlistId: string): Promise<void> {
+  playlistItemsContainer.innerHTML =
+    `<p class="playlist-video-loading">불러오는 중...</p>`;
+  pendingRemovals = [];
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "GET_PLAYLIST_ITEMS",
+      payload: { playlistId },
+    });
+
+    if (response.success) {
+      renderPlaylistItems(response.playlistItems ?? []);
+    } else {
+      playlistItemsContainer.innerHTML =
+        `<p class="playlist-video-empty">불러오기 실패</p>`;
+    }
+  } catch {
+    playlistItemsContainer.innerHTML =
+      `<p class="playlist-video-empty">불러오기 실패</p>`;
+  }
 }
 
 function renderPlaylists(
-  playlists: { id: string; title: string; itemCount: number }[]
+  playlists: {
+    id: string;
+    title: string;
+    description: string;
+    privacyStatus: string;
+    itemCount: number;
+  }[]
 ): void {
   playlistListContainer.innerHTML = "";
 
@@ -173,10 +310,68 @@ function renderPlaylists(
     count.className = "playlist-item-count";
     count.textContent = `${playlist.itemCount}개`;
 
+    const addBtn = document.createElement("button");
+    addBtn.className = "playlist-item-add-btn";
+    addBtn.textContent = "+";
+    addBtn.title = "임시 리스트 영상 추가";
+    addBtn.disabled = currentTempList.length === 0;
+    addBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await handleAddTempToPlaylist(playlist.id, playlist.title, addBtn);
+    });
+
     item.appendChild(title);
     item.appendChild(count);
+    item.appendChild(addBtn);
+
+    item.addEventListener("click", async () => {
+      switchToEditMode({
+        id: playlist.id,
+        title: playlist.title,
+        description: playlist.description ?? "",
+        privacyStatus: playlist.privacyStatus ?? "private",
+      });
+      await loadPlaylistItems(playlist.id);
+    });
+
     playlistListContainer.appendChild(item);
   });
+}
+
+async function handleAddTempToPlaylist(
+  playlistId: string,
+  playlistTitle: string,
+  btn: HTMLButtonElement
+): Promise<void> {
+  if (currentTempList.length === 0) {
+    alert("추가할 영상이 없습니다.");
+    return;
+  }
+
+  if (!confirm(`"${playlistTitle}"에 ${currentTempList.length}개의 영상을 추가할까요?`)) {
+    return;
+  }
+
+  try {
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    const response: MessageResponse = await chrome.runtime.sendMessage({
+      type: "ADD_TEMP_TO_PLAYLIST",
+      payload: { playlistId },
+    });
+
+    if (response.success) {
+      renderPlaylists(response.playlists ?? []);
+    } else {
+      alert(`추가 실패: ${response.error}`);
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btn.textContent = "+";
+    btn.disabled = currentTempList.length === 0;
+  }
 }
 
 async function loadPlaylists(forceRefresh = false): Promise<void> {
@@ -207,7 +402,7 @@ async function loadTempList(): Promise<void> {
     if (response.success) {
       currentTempList = response.list as VideoItem[];
       tempList.render(currentTempList);
-      updateCreateBtn();
+      updateSubmitBtn();
     }
   } catch (error) {
     console.error("[YT Playlist Manager] tempList 로드 실패:", error);
@@ -222,6 +417,8 @@ function showLoginView(): void {
   currentTempList = [];
   isDraggedManually = false;
   userTempRatio = 0;
+  selectedPlaylist = null;
+  pendingRemovals = [];
 }
 
 async function showMainView(userId: string): Promise<void> {
@@ -229,18 +426,12 @@ async function showMainView(userId: string): Promise<void> {
   mainView.classList.remove("hidden");
 
   applyInitialHeight();
+  switchToTempListMode();
 
   const { displayName } = await chrome.storage.local.get("displayName");
   userInfo.textContent = displayName ?? `채널 ID: ${userId}`;
 
   await Promise.all([loadTempList(), loadPlaylists()]);
-}
-
-function resetForm(): void {
-  playlistTitleInput.value = "";
-  playlistDescriptionInput.value = "";
-  playlistPrivacySelect.value = "private";
-  updateCreateBtn();
 }
 
 async function init(): Promise<void> {
@@ -265,24 +456,84 @@ async function init(): Promise<void> {
   }
 }
 
+backBtn.addEventListener("click", () => {
+  switchToTempListMode();
+});
+
 playlistTitleInput.addEventListener("input", () => {
-  updateCreateBtn();
+  updateSubmitBtn();
 });
 
 refreshPlaylistsBtn.addEventListener("click", () => {
   loadPlaylists(true);
 });
 
-createPlaylistBtn.addEventListener("click", async () => {
+submitPlaylistBtn.addEventListener("click", async () => {
   const title = playlistTitleInput.value.trim();
   const description = playlistDescriptionInput.value.trim();
   const privacyStatus = playlistPrivacySelect.value;
 
   if (!title) return;
 
+  // 수정 모드
+  if (selectedPlaylist) {
+    try {
+      submitPlaylistBtn.disabled = true;
+      submitPlaylistBtn.textContent = "수정 중...";
+
+      // ✅ 일괄 제거 메시지로 변경 - 응답 확인 후 실패 시 중단
+      if (pendingRemovals.length > 0) {
+        const removeResponse: MessageResponse = await chrome.runtime.sendMessage({
+          type: "REMOVE_PLAYLIST_ITEMS_BATCH",
+          payload: {
+            playlistId: selectedPlaylist.id,
+            playlistItemIds: pendingRemovals,
+          },
+        });
+
+        if (!removeResponse.success) {
+          alert(`영상 제거 실패: ${removeResponse.error}`);
+          submitPlaylistBtn.disabled = false;
+          return;
+        }
+
+        // ✅ 일부 실패 시 사용자에게 알림 (전체 실패는 위에서 처리)
+        if (removeResponse.error) {
+          alert(`일부 영상 제거 실패: ${removeResponse.error}`);
+        }
+      }
+
+      // ✅ 재생목록 정보 수정
+      const response: MessageResponse = await chrome.runtime.sendMessage({
+        type: "UPDATE_PLAYLIST",
+        payload: {
+          playlistId: selectedPlaylist.id,
+          title,
+          description,
+          privacyStatus,
+        },
+      });
+
+      if (response.success) {
+        await loadPlaylists();
+        switchToTempListMode();
+      } else {
+        alert(`수정 실패: ${response.error}`);
+        submitPlaylistBtn.disabled = false;
+      }
+    } catch (error) {
+      alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+      submitPlaylistBtn.disabled = false;
+    } finally {
+      submitPlaylistBtn.textContent = "재생목록 수정";
+    }
+    return;
+  }
+
+  // 생성 모드
   try {
-    createPlaylistBtn.disabled = true;
-    createPlaylistBtn.textContent = "생성 중...";
+    submitPlaylistBtn.disabled = true;
+    submitPlaylistBtn.textContent = "생성 중...";
 
     const response: MessageResponse = await chrome.runtime.sendMessage({
       type: "CREATE_PLAYLIST",
@@ -290,17 +541,17 @@ createPlaylistBtn.addEventListener("click", async () => {
     });
 
     if (response.success) {
-      resetForm();
+      switchToTempListMode();
       renderPlaylists(response.playlists ?? []);
     } else {
       alert(`재생목록 생성 실패: ${response.error}`);
-      createPlaylistBtn.disabled = false;
+      submitPlaylistBtn.disabled = false;
     }
   } catch (error) {
     alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
-    createPlaylistBtn.disabled = false;
+    submitPlaylistBtn.disabled = false;
   } finally {
-    createPlaylistBtn.textContent = "재생목록 생성";
+    submitPlaylistBtn.textContent = "재생목록 생성";
   }
 });
 
@@ -320,7 +571,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ("tempList" in changes) {
     currentTempList = (changes.tempList.newValue as VideoItem[]) ?? [];
     tempList.render(currentTempList);
-    updateCreateBtn();
+    updateSubmitBtn();
+    document.querySelectorAll<HTMLButtonElement>(".playlist-item-add-btn").forEach((btn) => {
+      btn.disabled = currentTempList.length === 0;
+    });
   }
 });
 

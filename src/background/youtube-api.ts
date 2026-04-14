@@ -10,38 +10,62 @@ export class QuotaExceededError extends Error {
   }
 }
 
-/** YouTube API 재생목록 응답 타입 */
 interface YouTubePlaylistItem {
   id: string;
   snippet: {
     title: string;
+    description: string;
   };
   contentDetails: {
     itemCount: number;
   };
+  status: {
+    privacyStatus: string;
+  };
 }
 
-/** YouTube API 재생목록 응답 wrapper 타입 */
 interface YouTubePlaylistResponse {
   items: YouTubePlaylistItem[];
   nextPageToken?: string;
 }
 
-/** YouTube API 단일 재생목록 응답 타입 */
 interface YouTubePlaylistSingleResponse {
   id: string;
   snippet: {
     title: string;
+    description: string;
   };
   contentDetails?: {
     itemCount: number;
   };
+  status?: {
+    privacyStatus: string;
+  };
 }
 
-/** 공개 여부 타입 */
+export interface PlaylistItem {
+  playlistItemId: string;
+  videoId: string;
+  title: string;
+  thumbnail: string;
+}
+
+interface YouTubePlaylistItemResponse {
+  id: string;
+  snippet: {
+    title: string;
+    resourceId: {
+      videoId: string;
+    };
+    thumbnails?: {
+      default?: { url: string };
+      medium?: { url: string };
+    };
+  };
+}
+
 export type PrivacyStatus = "public" | "unlisted" | "private";
 
-/** 인증된 fetch 요청 (401 시 토큰 재발급 후 1회 재시도, 403 시 Quota 안내) */
 async function fetchWithAuth(
   url: string,
   options: RequestInit = {}
@@ -75,13 +99,13 @@ async function fetchWithAuth(
   return response;
 }
 
-/** 재생목록 목록 조회 (페이지네이션 적용) */
+// ✅ description, privacyStatus 포함하여 조회
 export async function getPlaylists(): Promise<Playlist[]> {
   const playlists: Playlist[] = [];
   let pageToken: string | undefined;
 
   do {
-    const url = `${BASE_URL}/playlists?part=snippet,contentDetails&mine=true&maxResults=50${
+    const url = `${BASE_URL}/playlists?part=snippet,contentDetails,status&mine=true&maxResults=50${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
 
@@ -92,6 +116,8 @@ export async function getPlaylists(): Promise<Playlist[]> {
       playlists.push({
         id: item.id,
         title: item.snippet.title,
+        description: item.snippet.description,
+        privacyStatus: item.status.privacyStatus,
         itemCount: item.contentDetails.itemCount,
       });
     });
@@ -102,13 +128,42 @@ export async function getPlaylists(): Promise<Playlist[]> {
   return playlists;
 }
 
-/** 재생목록 생성 */
+export async function getPlaylistItems(playlistId: string): Promise<PlaylistItem[]> {
+  const items: PlaylistItem[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50${
+      pageToken ? `&pageToken=${pageToken}` : ""
+    }`;
+
+    const response = await fetchWithAuth(url);
+    const data: { items: YouTubePlaylistItemResponse[]; nextPageToken?: string } =
+      await response.json();
+
+    data.items.forEach((item: YouTubePlaylistItemResponse) => {
+      items.push({
+        playlistItemId: item.id,
+        videoId: item.snippet.resourceId.videoId,
+        title: item.snippet.title,
+        thumbnail:
+          item.snippet.thumbnails?.medium?.url ??
+          item.snippet.thumbnails?.default?.url ??
+          `https://i.ytimg.com/vi/${item.snippet.resourceId.videoId}/mqdefault.jpg`,
+      });
+    });
+
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return items;
+}
+
 export async function createPlaylist(
   title: string,
   description: string = "",
   privacyStatus: PrivacyStatus = "private"
 ): Promise<Playlist> {
-  // ✅ contentDetails 제거 - 읽기 전용이라 insert 시 400 오류 발생
   const url = `${BASE_URL}/playlists?part=snippet,status`;
   const response = await fetchWithAuth(url, {
     method: "POST",
@@ -122,21 +177,26 @@ export async function createPlaylist(
   return {
     id: data.id,
     title: data.snippet.title,
+    description: data.snippet.description,
+    privacyStatus: data.status?.privacyStatus ?? "private",
     itemCount: data.contentDetails?.itemCount ?? 0,
   };
 }
 
-/** 재생목록 수정 */
+// ✅ contentDetails 추가로 itemCount 정상 반환
 export async function updatePlaylist(
   playlistId: string,
-  title: string
+  title: string,
+  description: string = "",
+  privacyStatus: PrivacyStatus = "private"
 ): Promise<Playlist> {
-  const url = `${BASE_URL}/playlists?part=snippet,contentDetails`;
+  const url = `${BASE_URL}/playlists?part=snippet,status,contentDetails`;
   const response = await fetchWithAuth(url, {
     method: "PUT",
     body: JSON.stringify({
       id: playlistId,
-      snippet: { title },
+      snippet: { title, description },
+      status: { privacyStatus },
     }),
   });
   const data: YouTubePlaylistSingleResponse = await response.json();
@@ -144,17 +204,17 @@ export async function updatePlaylist(
   return {
     id: data.id,
     title: data.snippet.title,
+    description: data.snippet.description,
+    privacyStatus: data.status?.privacyStatus ?? privacyStatus,
     itemCount: data.contentDetails?.itemCount ?? 0,
   };
 }
 
-/** 재생목록 삭제 */
 export async function deletePlaylist(playlistId: string): Promise<void> {
   const url = `${BASE_URL}/playlists?id=${playlistId}`;
   await fetchWithAuth(url, { method: "DELETE" });
 }
 
-/** 재생목록에 영상 추가 */
 export async function addItemToPlaylist(
   playlistId: string,
   videoId: string
@@ -174,7 +234,6 @@ export async function addItemToPlaylist(
   });
 }
 
-/** 재생목록에서 영상 제거 */
 export async function removeItemFromPlaylist(
   playlistItemId: string
 ): Promise<void> {

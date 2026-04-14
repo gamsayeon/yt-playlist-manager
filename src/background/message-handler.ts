@@ -11,11 +11,14 @@ import {
 } from "./storage";
 import {
   getPlaylists,
+  getPlaylistItems,
   createPlaylist,
+  updatePlaylist,
   deletePlaylist,
   addItemToPlaylist,
   removeItemFromPlaylist,
   PrivacyStatus,
+  PlaylistItem,
 } from "./youtube-api";
 import { login, logout } from "./auth";
 
@@ -25,6 +28,7 @@ type SendResponse = (response: {
   list?: VideoItem[];
   playlists?: Playlist[];
   playlist?: Playlist;
+  playlistItems?: PlaylistItem[];
   error?: string;
 }) => void;
 
@@ -62,6 +66,24 @@ async function updateAndRefreshPlaylists(
     await setCachedPlaylists(playlists);
     sendResponse({ success: true, playlists });
   });
+}
+
+async function updateCachedItemCount(
+  playlistId: string,
+  delta: number
+): Promise<Playlist[] | null> {
+  const cached = await getCachedPlaylists();
+  if (!cached) return null;
+
+  const updated = cached.map((p) => {
+    if (p.id !== playlistId) return p;
+    return {
+      ...p,
+      itemCount: Math.max(0, p.itemCount + delta),
+    };
+  });
+  await setCachedPlaylists(updated);
+  return updated;
 }
 
 export function registerMessageHandler(): void {
@@ -141,7 +163,6 @@ export function registerMessageHandler(): void {
         });
         return true;
 
-      // ✅ 캐시 무효화 후 강제 재조회
       case "REFRESH_PLAYLISTS":
         handleAsync(sendResponse, async () => {
           await invalidatePlaylists();
@@ -150,6 +171,19 @@ export function registerMessageHandler(): void {
           sendResponse({ success: true, playlists });
         });
         return true;
+
+      case "GET_PLAYLIST_ITEMS": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const playlistItems = await getPlaylistItems(playlistId);
+          sendResponse({ success: true, playlistItems });
+        });
+        return true;
+      }
 
       case "CREATE_PLAYLIST": {
         const { title, description, privacyStatus } = message.payload ?? {};
@@ -168,20 +202,17 @@ export function registerMessageHandler(): void {
             throw new Error("재생목록에 추가할 영상이 없습니다.");
           }
 
-          // 1. 재생목록 생성
           const playlist = await createPlaylist(
             title,
             description ?? "",
             validatedPrivacyStatus
           );
 
-          // 2. 영상 순차 추가 (YouTube API Rate Limit 고려)
           try {
             for (const video of tempItems) {
               await addItemToPlaylist(playlist.id, video.videoId);
             }
           } catch (error) {
-            // 3. 영상 추가 실패 시 롤백 - 원본 에러 보존
             try {
               await deletePlaylist(playlist.id);
             } catch (rollbackError) {
@@ -190,14 +221,72 @@ export function registerMessageHandler(): void {
             throw error;
           }
 
-          // 4. tempList 초기화
           await clearTempList();
 
-          // 5. 재생목록 캐시 갱신
-          const playlists = await getPlaylists();
-          await setCachedPlaylists(playlists);
+          const cached = await getCachedPlaylists();
+          const newPlaylist: Playlist = {
+            id: playlist.id,
+            title: playlist.title,
+            description: playlist.description,
+            privacyStatus: playlist.privacyStatus,
+            itemCount: tempItems.length,
+          };
+
+          let playlists: Playlist[];
+          if (cached) {
+            playlists = [newPlaylist, ...cached];
+            await setCachedPlaylists(playlists);
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
 
           sendResponse({ success: true, playlist, playlists, list: [] });
+        });
+        return true;
+      }
+
+      case "UPDATE_PLAYLIST": {
+        // ✅ removedCount 제거 - REMOVE_PLAYLIST_ITEMS_BATCH에서 이미 처리
+        const { playlistId, title, description, privacyStatus } =
+          message.payload ?? {};
+        if (!playlistId || !title) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+
+        const validatedPrivacyStatus: PrivacyStatus = isValidPrivacyStatus(privacyStatus)
+          ? privacyStatus
+          : "private";
+
+        handleAsync(sendResponse, async () => {
+          await updatePlaylist(
+            playlistId,
+            title,
+            description ?? "",
+            validatedPrivacyStatus
+          );
+
+          // ✅ itemCount 차감 제거 - 이중 차감 방지
+          const cached = await getCachedPlaylists();
+          let playlists: Playlist[];
+          if (cached) {
+            playlists = cached.map((p) => {
+              if (p.id !== playlistId) return p;
+              return {
+                ...p,
+                title,
+                description: description ?? "",
+                privacyStatus: validatedPrivacyStatus,
+              };
+            });
+            await setCachedPlaylists(playlists);
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
+
+          sendResponse({ success: true, playlists });
         });
         return true;
       }
@@ -215,6 +304,37 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      case "ADD_TEMP_TO_PLAYLIST": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const tempItems = await getTempList();
+          if (tempItems.length === 0) {
+            throw new Error("추가할 영상이 없습니다.");
+          }
+
+          for (const video of tempItems) {
+            await addItemToPlaylist(playlistId, video.videoId);
+          }
+          await clearTempList();
+
+          const updated = await updateCachedItemCount(playlistId, tempItems.length);
+          let playlists: Playlist[];
+          if (updated) {
+            playlists = updated;
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
+
+          sendResponse({ success: true, playlists, list: [] });
+        });
+        return true;
+      }
+
       case "ADD_TO_PLAYLIST": {
         const { playlistId, videoId } = message.payload ?? {};
         if (!playlistId || !videoId) {
@@ -228,6 +348,45 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      case "REMOVE_PLAYLIST_ITEMS_BATCH": {
+        const { playlistId, playlistItemIds } = message.payload ?? {};
+        if (!playlistId || !Array.isArray(playlistItemIds) || playlistItemIds.length === 0) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const errors: string[] = [];
+
+          for (const playlistItemId of playlistItemIds) {
+            try {
+              await removeItemFromPlaylist(playlistItemId);
+            } catch (error) {
+              errors.push(playlistItemId);
+              console.error("[YTPM] 영상 제거 실패:", playlistItemId, error);
+            }
+          }
+
+          if (errors.length > 0 && errors.length === playlistItemIds.length) {
+            throw new Error("모든 영상 제거에 실패했습니다.");
+          }
+
+          const successCount = playlistItemIds.length - errors.length;
+          const updated = await updateCachedItemCount(playlistId, -successCount);
+          const playlists = updated ?? (await getPlaylists());
+          if (!updated) await setCachedPlaylists(playlists);
+
+          sendResponse({
+            success: true,
+            playlists,
+            error: errors.length > 0
+              ? `${errors.length}개 영상 제거 실패`
+              : undefined,
+          });
+        });
+        return true;
+      }
+
+      // ✅ updateAndRefreshPlaylists 복구 - 캐시 갱신 regression 수정
       case "REMOVE_FROM_PLAYLIST": {
         const { playlistItemId } = message.payload ?? {};
         if (!playlistItemId) {
