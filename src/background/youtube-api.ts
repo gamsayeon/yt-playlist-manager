@@ -14,9 +14,13 @@ interface YouTubePlaylistItem {
   id: string;
   snippet: {
     title: string;
+    description: string;
   };
   contentDetails: {
     itemCount: number;
+  };
+  status: {
+    privacyStatus: string;
   };
 }
 
@@ -29,9 +33,13 @@ interface YouTubePlaylistSingleResponse {
   id: string;
   snippet: {
     title: string;
+    description: string;
   };
   contentDetails?: {
     itemCount: number;
+  };
+  status?: {
+    privacyStatus: string;
   };
 }
 
@@ -91,12 +99,13 @@ async function fetchWithAuth(
   return response;
 }
 
+// ✅ description, privacyStatus 포함하여 조회
 export async function getPlaylists(): Promise<Playlist[]> {
   const playlists: Playlist[] = [];
   let pageToken: string | undefined;
 
   do {
-    const url = `${BASE_URL}/playlists?part=snippet,contentDetails&mine=true&maxResults=50${
+    const url = `${BASE_URL}/playlists?part=snippet,contentDetails,status&mine=true&maxResults=50${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
 
@@ -107,6 +116,8 @@ export async function getPlaylists(): Promise<Playlist[]> {
       playlists.push({
         id: item.id,
         title: item.snippet.title,
+        description: item.snippet.description,
+        privacyStatus: item.status.privacyStatus,
         itemCount: item.contentDetails.itemCount,
       });
     });
@@ -166,18 +177,20 @@ export async function createPlaylist(
   return {
     id: data.id,
     title: data.snippet.title,
+    description: data.snippet.description,
+    privacyStatus: data.status?.privacyStatus ?? "private",
     itemCount: data.contentDetails?.itemCount ?? 0,
   };
 }
 
-// ✅ description, privacyStatus 파라미터 추가
+// ✅ contentDetails 추가로 itemCount 정상 반환
 export async function updatePlaylist(
   playlistId: string,
   title: string,
   description: string = "",
   privacyStatus: PrivacyStatus = "private"
 ): Promise<Playlist> {
-  const url = `${BASE_URL}/playlists?part=snippet,status`;
+  const url = `${BASE_URL}/playlists?part=snippet,status,contentDetails`;
   const response = await fetchWithAuth(url, {
     method: "PUT",
     body: JSON.stringify({
@@ -191,6 +204,8 @@ export async function updatePlaylist(
   return {
     id: data.id,
     title: data.snippet.title,
+    description: data.snippet.description,
+    privacyStatus: data.status?.privacyStatus ?? privacyStatus,
     itemCount: data.contentDetails?.itemCount ?? 0,
   };
 }

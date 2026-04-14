@@ -14,6 +14,8 @@ export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 export interface Playlist {
   id: string;
   title: string;
+  description: string;
+  privacyStatus: string;
   itemCount: number;
 }
 

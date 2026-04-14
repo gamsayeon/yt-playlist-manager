@@ -291,14 +291,14 @@ async function loadPlaylistItems(playlistId: string): Promise<void> {
   }
 }
 
-function updateCreateBtn(): void {
-  if (!selectedPlaylist) {
-    updateSubmitBtn();
-  }
-}
-
 function renderPlaylists(
-  playlists: { id: string; title: string; itemCount: number }[]
+  playlists: {
+    id: string;
+    title: string;
+    description: string;
+    privacyStatus: string;
+    itemCount: number;
+  }[]
 ): void {
   playlistListContainer.innerHTML = "";
 
@@ -340,11 +340,12 @@ function renderPlaylists(
 
     // ✅ 재생목록 클릭 시 수정 모드 전환
     item.addEventListener("click", async () => {
+      // ✅ 실제 description, privacyStatus 전달
       switchToEditMode({
         id: playlist.id,
         title: playlist.title,
-        description: "",
-        privacyStatus: "private",
+        description: playlist.description ?? "",
+        privacyStatus: playlist.privacyStatus ?? "private",
       });
       await loadPlaylistItems(playlist.id);
     });

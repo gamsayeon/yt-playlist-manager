@@ -213,7 +213,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ 재생목록 수정
       case "UPDATE_PLAYLIST": {
         const { playlistId, title, description, privacyStatus } = message.payload ?? {};
         if (!playlistId || !title) {
@@ -254,6 +253,7 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      // ✅ 영상 추가 성공 시마다 tempList에서 즉시 제거 → 중복 방지
       case "ADD_TEMP_TO_PLAYLIST": {
         const { playlistId } = message.payload ?? {};
         if (!playlistId) {
@@ -268,9 +268,9 @@ export function registerMessageHandler(): void {
 
           for (const video of tempItems) {
             await addItemToPlaylist(playlistId, video.videoId);
+            // ✅ 성공 시 즉시 tempList에서 제거
+            await removeFromTempList(video.videoId);
           }
-
-          await clearTempList();
 
           const playlists = await getPlaylists();
           await setCachedPlaylists(playlists);
