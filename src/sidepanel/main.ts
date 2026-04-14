@@ -511,7 +511,6 @@ submitPlaylistBtn.addEventListener("click", async () => {
           title,
           description,
           privacyStatus,
-          removedCount: pendingRemovals.length,
         },
       });
 

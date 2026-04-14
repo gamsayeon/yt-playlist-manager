@@ -221,7 +221,6 @@ export function registerMessageHandler(): void {
             throw error;
           }
 
-          // ✅ 루프 후 한 번만 clearTempList 호출
           await clearTempList();
 
           const cached = await getCachedPlaylists();
@@ -248,7 +247,8 @@ export function registerMessageHandler(): void {
       }
 
       case "UPDATE_PLAYLIST": {
-        const { playlistId, title, description, privacyStatus, removedCount } =
+        // ✅ removedCount 제거 - REMOVE_PLAYLIST_ITEMS_BATCH에서 이미 처리
+        const { playlistId, title, description, privacyStatus } =
           message.payload ?? {};
         if (!playlistId || !title) {
           sendResponse({ success: false, error: "Invalid payload" });
@@ -267,6 +267,7 @@ export function registerMessageHandler(): void {
             validatedPrivacyStatus
           );
 
+          // ✅ itemCount 차감 제거 - 이중 차감 방지
           const cached = await getCachedPlaylists();
           let playlists: Playlist[];
           if (cached) {
@@ -277,7 +278,6 @@ export function registerMessageHandler(): void {
                 title,
                 description: description ?? "",
                 privacyStatus: validatedPrivacyStatus,
-                itemCount: Math.max(0, p.itemCount - (removedCount ?? 0)),
               };
             });
             await setCachedPlaylists(playlists);
@@ -316,7 +316,6 @@ export function registerMessageHandler(): void {
             throw new Error("추가할 영상이 없습니다.");
           }
 
-          // ✅ 루프 내에서는 추가만, 루프 후 clearTempList 한 번 호출
           for (const video of tempItems) {
             await addItemToPlaylist(playlistId, video.videoId);
           }
@@ -349,7 +348,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ 일괄 제거 메시지 타입 추가
       case "REMOVE_PLAYLIST_ITEMS_BATCH": {
         const { playlistId, playlistItemIds } = message.payload ?? {};
         if (!playlistId || !Array.isArray(playlistItemIds) || playlistItemIds.length === 0) {
@@ -372,7 +370,6 @@ export function registerMessageHandler(): void {
             throw new Error("모든 영상 제거에 실패했습니다.");
           }
 
-          // ✅ 성공한 항목 수만큼 캐시 itemCount 차감
           const successCount = playlistItemIds.length - errors.length;
           const updated = await updateCachedItemCount(playlistId, -successCount);
           const playlists = updated ?? (await getPlaylists());
@@ -389,16 +386,17 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      // ✅ updateAndRefreshPlaylists 복구 - 캐시 갱신 regression 수정
       case "REMOVE_FROM_PLAYLIST": {
         const { playlistItemId } = message.payload ?? {};
         if (!playlistItemId) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        handleAsync(sendResponse, async () => {
-          await removeItemFromPlaylist(playlistItemId);
-          sendResponse({ success: true });
-        });
+        updateAndRefreshPlaylists(
+          () => removeItemFromPlaylist(playlistItemId),
+          sendResponse
+        );
         return true;
       }
 
