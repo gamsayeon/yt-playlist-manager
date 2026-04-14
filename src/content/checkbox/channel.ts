@@ -1,10 +1,7 @@
-// src/content/checkbox/channel.ts
-
 import type { VideoInfo } from "./types";
-import { injectInto } from "./utils";
+import { injectInto, getThumbnailUrl } from "./utils";
 
 export function parseChannelVideoInfo(item: Element): VideoInfo | null {
-  // 채널 탭은 ytd-rich-grid-media 사용
   const thumbnailLink = item.querySelector(
     "ytd-thumbnail a#thumbnail"
   ) as HTMLAnchorElement | null;
@@ -19,11 +16,7 @@ export function parseChannelVideoInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "ytd-thumbnail img, yt-image img"
   ) as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectChannelCheckbox(item: Element, videoInfo: VideoInfo): void {

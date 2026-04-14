@@ -1,7 +1,6 @@
-// src/content/checkbox/search.ts
-
 import type { VideoInfo } from "./types";
 import { injectFixedCheckbox } from "./fixed-checkbox";
+import { getThumbnailUrl } from "./utils";
 
 export function parseSearchVideoInfo(item: Element): VideoInfo | null {
   const thumbnailLink = item.querySelector("a#thumbnail") as HTMLAnchorElement | null;
@@ -9,31 +8,16 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
 
   const href = thumbnailLink.href;
 
-  const shortsIdMatch = href.match(/\/shorts\/([^?&]+)/);
-  if (shortsIdMatch) {
-    const videoId = shortsIdMatch[1];
-    const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
-    const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    return {
-      videoId,
-      title,
-      thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-    };
-  }
+  // ✅ videoId 확인 후 DOM 쿼리 수행으로 불필요한 쿼리 방지
+  const videoId =
+    href.match(/\/shorts\/([^?&]+)/)?.[1] ??
+    href.match(/[?&]v=([^&]+)/)?.[1];
+  if (!videoId) return null;
 
-  const videoIdMatch = href.match(/[?&]v=([^&]+)/);
-  if (videoIdMatch) {
-    const videoId = videoIdMatch[1];
-    const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
-    const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    return {
-      videoId,
-      title,
-      thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-    };
-  }
+  const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
+  const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
 
-  return null;
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function parseSearchShortsInfo(item: Element): VideoInfo | null {
@@ -50,11 +34,7 @@ export function parseSearchShortsInfo(item: Element): VideoInfo | null {
     item.querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
       ?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectSearchCheckbox(item: Element, videoInfo: VideoInfo): void {

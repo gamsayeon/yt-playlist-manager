@@ -1,8 +1,5 @@
-// ✅ /watch 추천 영상
-// ✅ /watch 쇼츠
-
 import type { VideoInfo } from "./types";
-import { injectInto } from "./utils";
+import { injectInto, getThumbnailUrl } from "./utils";
 
 export function parseWatchVideoInfo(item: Element): VideoInfo | null {
   const videoLink = item.querySelector(
@@ -19,11 +16,7 @@ export function parseWatchVideoInfo(item: Element): VideoInfo | null {
       "h3.yt-lockup-metadata-view-model__heading-reset a span, h3.ytLockupMetadataViewModelHeadingReset a span"
     )?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectWatchCheckbox(item: Element, videoInfo: VideoInfo): void {
@@ -50,11 +43,7 @@ export function parseWatchShortsInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "div.ytThumbnailViewModelImage img"
   ) as HTMLImageElement | null;
-  return {
-    videoId,
-    title,
-    thumbnail: imgEl?.src ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-  };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectWatchShortsCheckbox(item: Element, videoInfo: VideoInfo): void {
