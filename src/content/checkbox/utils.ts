@@ -1,5 +1,10 @@
 import type { VideoInfo } from "./types";
 
+// ✅ fallback 썸네일 URL 생성 유틸
+export function getThumbnailUrl(videoId: string, imgEl: HTMLImageElement | null): string {
+  return imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+}
+
 export function createCheckbox(videoInfo: VideoInfo): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.setAttribute("data-ytpm-checkbox", "true");

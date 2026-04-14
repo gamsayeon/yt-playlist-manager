@@ -1,30 +1,26 @@
 import type { VideoInfo } from "./types";
 import { injectFixedCheckbox } from "./fixed-checkbox";
+import { getThumbnailUrl } from "./utils";
 
 export function parseSearchVideoInfo(item: Element): VideoInfo | null {
   const thumbnailLink = item.querySelector("a#thumbnail") as HTMLAnchorElement | null;
   if (!thumbnailLink?.href) return null;
 
   const href = thumbnailLink.href;
+  const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
+  const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
 
+  // ✅ videoId 먼저 결정 후 공통 로직 처리
   const shortsIdMatch = href.match(/\/shorts\/([^?&]+)/);
   if (shortsIdMatch) {
     const videoId = shortsIdMatch[1];
-    const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
-    const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    const thumbnail =
-      imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-    return { videoId, title, thumbnail };
+    return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
   }
 
   const videoIdMatch = href.match(/[?&]v=([^&]+)/);
   if (videoIdMatch) {
     const videoId = videoIdMatch[1];
-    const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
-    const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    const thumbnail =
-      imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-    return { videoId, title, thumbnail };
+    return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
   }
 
   return null;
@@ -44,9 +40,7 @@ export function parseSearchShortsInfo(item: Element): VideoInfo | null {
     item.querySelector("h3.shortsLockupViewModelHostMetadataTitle a span")
       ?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  const thumbnail =
-    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-  return { videoId, title, thumbnail };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectSearchCheckbox(item: Element, videoInfo: VideoInfo): void {

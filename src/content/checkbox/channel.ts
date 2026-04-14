@@ -1,5 +1,5 @@
 import type { VideoInfo } from "./types";
-import { injectInto } from "./utils";
+import { injectInto, getThumbnailUrl } from "./utils";
 
 export function parseChannelVideoInfo(item: Element): VideoInfo | null {
   const thumbnailLink = item.querySelector(
@@ -16,9 +16,7 @@ export function parseChannelVideoInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "ytd-thumbnail img, yt-image img"
   ) as HTMLImageElement | null;
-  const thumbnail =
-    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-  return { videoId, title, thumbnail };
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function injectChannelCheckbox(item: Element, videoInfo: VideoInfo): void {
