@@ -292,6 +292,10 @@ async function handleDeletePlaylist(
     });
 
     if (response.success) {
+      // ✅ 현재 수정 중인 재생목록이 삭제된 경우 임시 리스트 모드로 전환
+      if (selectedPlaylist?.id === playlistId) {
+        switchToTempListMode();
+      }
       renderPlaylists(response.playlists ?? []);
     } else {
       alert(`삭제 실패: ${response.error}`);
