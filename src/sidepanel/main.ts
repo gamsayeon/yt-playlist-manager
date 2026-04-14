@@ -34,7 +34,6 @@ const tempList = new TempList(tempListContainer);
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
 
-// 현재 선택된 재생목록 정보
 let selectedPlaylist: {
   id: string;
   title: string;
@@ -156,7 +155,6 @@ function initDivider(): void {
   });
 }
 
-// ✅ 임시 리스트 모드로 전환
 function switchToTempListMode(): void {
   tempListMode.classList.remove("hidden");
   playlistEditMode.classList.add("hidden");
@@ -171,7 +169,6 @@ function switchToTempListMode(): void {
   updateSubmitBtn();
 }
 
-// ✅ 재생목록 수정 모드로 전환
 function switchToEditMode(playlist: {
   id: string;
   title: string;
@@ -203,7 +200,6 @@ function updateSubmitBtn(): void {
   }
 }
 
-// ✅ 재생목록 내 영상 목록 렌더링 (로컬 제거 대기 반영)
 function renderPlaylistItems(items: PlaylistItem[]): void {
   playlistItemsContainer.innerHTML = "";
 
@@ -220,7 +216,6 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
     row.className = "playlist-video-item";
     row.dataset.playlistItemId = item.playlistItemId;
 
-    // ✅ 제거 대기 중인 영상은 취소선 표시
     if (pendingRemovals.includes(item.playlistItemId)) {
       row.classList.add("pending-removal");
     }
@@ -243,13 +238,10 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
     removeBtn.textContent = pendingRemovals.includes(item.playlistItemId) ? "↩" : "✕";
     removeBtn.setAttribute("aria-label", `${item.title} 제거`);
 
-    // ✅ 즉시 API 호출 대신 로컬에서만 토글
     removeBtn.addEventListener("click", () => {
       if (pendingRemovals.includes(item.playlistItemId)) {
-        // 제거 취소
         pendingRemovals = pendingRemovals.filter((id) => id !== item.playlistItemId);
       } else {
-        // 제거 예약
         pendingRemovals.push(item.playlistItemId);
       }
       row.classList.toggle("pending-removal");
@@ -263,7 +255,6 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
   });
 }
 
-// ✅ 재생목록 내 영상 목록 조회
 async function loadPlaylistItems(playlistId: string): Promise<void> {
   playlistItemsContainer.innerHTML =
     `<p class="playlist-video-loading">불러오는 중...</p>`;
@@ -334,7 +325,6 @@ function renderPlaylists(
     item.appendChild(count);
     item.appendChild(addBtn);
 
-    // ✅ 재생목록 클릭 시 수정 모드 전환
     item.addEventListener("click", async () => {
       switchToEditMode({
         id: playlist.id,
@@ -479,7 +469,6 @@ refreshPlaylistsBtn.addEventListener("click", () => {
   loadPlaylists(true);
 });
 
-// ✅ 생성/수정 통합 버튼
 submitPlaylistBtn.addEventListener("click", async () => {
   const title = playlistTitleInput.value.trim();
   const description = playlistDescriptionInput.value.trim();
@@ -509,11 +498,13 @@ submitPlaylistBtn.addEventListener("click", async () => {
           title,
           description,
           privacyStatus,
+          removedCount: pendingRemovals.length, // ✅ 제거된 영상 수 전달
         },
       });
 
       if (response.success) {
-        renderPlaylists(response.playlists ?? []);
+        // ✅ loadPlaylists로 캐시 갱신 없이 현재 목록 유지
+        await loadPlaylists();
         switchToTempListMode();
       } else {
         alert(`수정 실패: ${response.error}`);

@@ -68,6 +68,25 @@ async function updateAndRefreshPlaylists(
   });
 }
 
+// ✅ 캐시에서 특정 재생목록 itemCount 직접 수정
+async function updateCachedItemCount(
+  playlistId: string,
+  delta: number
+): Promise<Playlist[] | null> {
+  const cached = await getCachedPlaylists();
+  if (!cached) return null;
+
+  const updated = cached.map((p) => {
+    if (p.id !== playlistId) return p;
+    return {
+      ...p,
+      itemCount: Math.max(0, p.itemCount + delta),
+    };
+  });
+  await setCachedPlaylists(updated);
+  return updated;
+}
+
 export function registerMessageHandler(): void {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isInternalSender(sender)) {
@@ -205,8 +224,24 @@ export function registerMessageHandler(): void {
 
           await clearTempList();
 
-          const playlists = await getPlaylists();
-          await setCachedPlaylists(playlists);
+          // ✅ 캐시에 새 재생목록 추가
+          const cached = await getCachedPlaylists();
+          const newPlaylist: Playlist = {
+            id: playlist.id,
+            title: playlist.title,
+            description: playlist.description,
+            privacyStatus: playlist.privacyStatus,
+            itemCount: tempItems.length,
+          };
+
+          let playlists: Playlist[];
+          if (cached) {
+            playlists = [newPlaylist, ...cached];
+            await setCachedPlaylists(playlists);
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
 
           sendResponse({ success: true, playlist, playlists, list: [] });
         });
@@ -214,7 +249,8 @@ export function registerMessageHandler(): void {
       }
 
       case "UPDATE_PLAYLIST": {
-        const { playlistId, title, description, privacyStatus } = message.payload ?? {};
+        const { playlistId, title, description, privacyStatus, removedCount } =
+          message.payload ?? {};
         if (!playlistId || !title) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
@@ -225,17 +261,34 @@ export function registerMessageHandler(): void {
           : "private";
 
         handleAsync(sendResponse, async () => {
-          const playlist = await updatePlaylist(
+          await updatePlaylist(
             playlistId,
             title,
             description ?? "",
             validatedPrivacyStatus
           );
 
-          const playlists = await getPlaylists();
-          await setCachedPlaylists(playlists);
+          // ✅ 캐시에서 해당 재생목록 직접 수정
+          const cached = await getCachedPlaylists();
+          let playlists: Playlist[];
+          if (cached) {
+            playlists = cached.map((p) => {
+              if (p.id !== playlistId) return p;
+              return {
+                ...p,
+                title,
+                description: description ?? "",
+                privacyStatus: validatedPrivacyStatus,
+                itemCount: Math.max(0, p.itemCount - (removedCount ?? 0)),
+              };
+            });
+            await setCachedPlaylists(playlists);
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
 
-          sendResponse({ success: true, playlist, playlists });
+          sendResponse({ success: true, playlists });
         });
         return true;
       }
@@ -253,7 +306,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ 영상 추가 성공 시마다 tempList에서 즉시 제거 → 중복 방지
       case "ADD_TEMP_TO_PLAYLIST": {
         const { playlistId } = message.payload ?? {};
         if (!playlistId) {
@@ -268,12 +320,18 @@ export function registerMessageHandler(): void {
 
           for (const video of tempItems) {
             await addItemToPlaylist(playlistId, video.videoId);
-            // ✅ 성공 시 즉시 tempList에서 제거
             await removeFromTempList(video.videoId);
           }
 
-          const playlists = await getPlaylists();
-          await setCachedPlaylists(playlists);
+          // ✅ 캐시에서 itemCount 직접 증가
+          const updated = await updateCachedItemCount(playlistId, tempItems.length);
+          let playlists: Playlist[];
+          if (updated) {
+            playlists = updated;
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
 
           sendResponse({ success: true, playlists, list: [] });
         });
@@ -299,10 +357,10 @@ export function registerMessageHandler(): void {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        updateAndRefreshPlaylists(
-          () => removeItemFromPlaylist(playlistItemId),
-          sendResponse
-        );
+        handleAsync(sendResponse, async () => {
+          await removeItemFromPlaylist(playlistItemId);
+          sendResponse({ success: true });
+        });
         return true;
       }
 
