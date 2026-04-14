@@ -277,6 +277,38 @@ async function loadPlaylistItems(playlistId: string): Promise<void> {
   }
 }
 
+// ✅ playlistTitle 파라미터 제거
+async function handleDeletePlaylist(
+  playlistId: string,
+  btn: HTMLButtonElement
+): Promise<void> {
+  try {
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    const response: MessageResponse = await chrome.runtime.sendMessage({
+      type: "DELETE_PLAYLIST",
+      payload: { playlistId },
+    });
+
+    if (response.success) {
+      // ✅ 현재 수정 중인 재생목록이 삭제된 경우 임시 리스트 모드로 전환
+      if (selectedPlaylist?.id === playlistId) {
+        switchToTempListMode();
+      }
+      renderPlaylists(response.playlists ?? []);
+    } else {
+      alert(`삭제 실패: ${response.error}`);
+      btn.disabled = false;
+      btn.textContent = "🗑";
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+    btn.disabled = false;
+    btn.textContent = "🗑";
+  }
+}
+
 function renderPlaylists(
   playlists: {
     id: string;
@@ -320,9 +352,26 @@ function renderPlaylists(
       await handleAddTempToPlaylist(playlist.id, playlist.title, addBtn);
     });
 
+    // ✅ 삭제 버튼
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "playlist-item-delete-btn";
+    deleteBtn.textContent = "🗑";
+    deleteBtn.title = "재생목록 삭제";
+    // ✅ aria-label 추가
+    deleteBtn.setAttribute("aria-label", `"${playlist.title}" 재생목록 삭제`);
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!confirm(`"${playlist.title}" 재생목록을 삭제할까요?\n삭제된 재생목록은 복구할 수 없습니다.`)) {
+        return;
+      }
+      // ✅ playlistTitle 파라미터 제거
+      void handleDeletePlaylist(playlist.id, deleteBtn);
+    });
+
     item.appendChild(title);
     item.appendChild(count);
     item.appendChild(addBtn);
+    item.appendChild(deleteBtn);
 
     item.addEventListener("click", async () => {
       switchToEditMode({
@@ -475,13 +524,11 @@ submitPlaylistBtn.addEventListener("click", async () => {
 
   if (!title) return;
 
-  // 수정 모드
   if (selectedPlaylist) {
     try {
       submitPlaylistBtn.disabled = true;
       submitPlaylistBtn.textContent = "수정 중...";
 
-      // ✅ 일괄 제거 메시지로 변경 - 응답 확인 후 실패 시 중단
       if (pendingRemovals.length > 0) {
         const removeResponse: MessageResponse = await chrome.runtime.sendMessage({
           type: "REMOVE_PLAYLIST_ITEMS_BATCH",
@@ -497,13 +544,11 @@ submitPlaylistBtn.addEventListener("click", async () => {
           return;
         }
 
-        // ✅ 일부 실패 시 사용자에게 알림 (전체 실패는 위에서 처리)
         if (removeResponse.error) {
           alert(`일부 영상 제거 실패: ${removeResponse.error}`);
         }
       }
 
-      // ✅ 재생목록 정보 수정
       const response: MessageResponse = await chrome.runtime.sendMessage({
         type: "UPDATE_PLAYLIST",
         payload: {
@@ -530,7 +575,6 @@ submitPlaylistBtn.addEventListener("click", async () => {
     return;
   }
 
-  // 생성 모드
   try {
     submitPlaylistBtn.disabled = true;
     submitPlaylistBtn.textContent = "생성 중...";
