@@ -7,23 +7,17 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
   if (!thumbnailLink?.href) return null;
 
   const href = thumbnailLink.href;
+
+  // ✅ videoId 확인 후 DOM 쿼리 수행으로 불필요한 쿼리 방지
+  const videoId =
+    href.match(/\/shorts\/([^?&]+)/)?.[1] ??
+    href.match(/[?&]v=([^&]+)/)?.[1];
+  if (!videoId) return null;
+
   const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
   const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
 
-  // ✅ videoId 먼저 결정 후 공통 로직 처리
-  const shortsIdMatch = href.match(/\/shorts\/([^?&]+)/);
-  if (shortsIdMatch) {
-    const videoId = shortsIdMatch[1];
-    return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
-  }
-
-  const videoIdMatch = href.match(/[?&]v=([^&]+)/);
-  if (videoIdMatch) {
-    const videoId = videoIdMatch[1];
-    return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
-  }
-
-  return null;
+  return { videoId, title, thumbnail: getThumbnailUrl(videoId, imgEl) };
 }
 
 export function parseSearchShortsInfo(item: Element): VideoInfo | null {
