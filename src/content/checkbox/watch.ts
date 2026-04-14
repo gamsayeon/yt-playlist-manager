@@ -16,9 +16,9 @@ export function parseWatchVideoInfo(item: Element): VideoInfo | null {
       "h3.yt-lockup-metadata-view-model__heading-reset a span, h3.ytLockupMetadataViewModelHeadingReset a span"
     )?.textContent?.trim() ?? "";
   const imgEl = item.querySelector("div.ytThumbnailViewModelImage img") as HTMLImageElement | null;
-  const src = imgEl?.src;
-  if (!src) return null;
-  return { videoId, title, thumbnail: src };
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  return { videoId, title, thumbnail };
 }
 
 export function injectWatchCheckbox(item: Element, videoInfo: VideoInfo): void {

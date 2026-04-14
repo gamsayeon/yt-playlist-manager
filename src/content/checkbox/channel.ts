@@ -16,9 +16,9 @@ export function parseChannelVideoInfo(item: Element): VideoInfo | null {
   const imgEl = item.querySelector(
     "ytd-thumbnail img, yt-image img"
   ) as HTMLImageElement | null;
-  const src = imgEl?.src;
-  if (!src) return null;
-  return { videoId, title, thumbnail: src };
+  const thumbnail =
+    imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  return { videoId, title, thumbnail };
 }
 
 export function injectChannelCheckbox(item: Element, videoInfo: VideoInfo): void {

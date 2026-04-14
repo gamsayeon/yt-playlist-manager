@@ -12,13 +12,9 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
     const videoId = shortsIdMatch[1];
     const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
     const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    const src = imgEl?.src;
-    if (!src) return null;
-    return {
-      videoId,
-      title,
-      thumbnail: src,
-    };
+    const thumbnail =
+      imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    return { videoId, title, thumbnail };
   }
 
   const videoIdMatch = href.match(/[?&]v=([^&]+)/);
@@ -26,13 +22,9 @@ export function parseSearchVideoInfo(item: Element): VideoInfo | null {
     const videoId = videoIdMatch[1];
     const title = item.querySelector("#video-title")?.textContent?.trim() ?? "";
     const imgEl = item.querySelector("yt-image img") as HTMLImageElement | null;
-    const src = imgEl?.src;
-    if (!src) return null;
-    return {
-      videoId,
-      title,
-      thumbnail: src,
-    };
+    const thumbnail =
+      imgEl?.src || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    return { videoId, title, thumbnail };
   }
 
   return null;
