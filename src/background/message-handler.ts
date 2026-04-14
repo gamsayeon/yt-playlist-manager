@@ -247,7 +247,6 @@ export function registerMessageHandler(): void {
       }
 
       case "UPDATE_PLAYLIST": {
-        // ✅ removedCount 제거 - REMOVE_PLAYLIST_ITEMS_BATCH에서 이미 처리
         const { playlistId, title, description, privacyStatus } =
           message.payload ?? {};
         if (!playlistId || !title) {
@@ -267,7 +266,6 @@ export function registerMessageHandler(): void {
             validatedPrivacyStatus
           );
 
-          // ✅ itemCount 차감 제거 - 이중 차감 방지
           const cached = await getCachedPlaylists();
           let playlists: Playlist[];
           if (cached) {
@@ -291,16 +289,28 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      // ✅ 캐시에서 직접 제거 후 즉시 갱신
       case "DELETE_PLAYLIST": {
         const playlistId = message.payload?.playlistId;
         if (!playlistId) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
-        updateAndRefreshPlaylists(
-          () => deletePlaylist(playlistId),
-          sendResponse
-        );
+        handleAsync(sendResponse, async () => {
+          await deletePlaylist(playlistId);
+
+          const cached = await getCachedPlaylists();
+          let playlists: Playlist[];
+          if (cached) {
+            playlists = cached.filter((p) => p.id !== playlistId);
+            await setCachedPlaylists(playlists);
+          } else {
+            playlists = await getPlaylists();
+            await setCachedPlaylists(playlists);
+          }
+
+          sendResponse({ success: true, playlists });
+        });
         return true;
       }
 
@@ -386,7 +396,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ updateAndRefreshPlaylists 복구 - 캐시 갱신 regression 수정
       case "REMOVE_FROM_PLAYLIST": {
         const { playlistItemId } = message.payload ?? {};
         if (!playlistItemId) {
