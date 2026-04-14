@@ -35,7 +35,15 @@ let currentTempList: VideoItem[] = [];
 let isInitialized = false;
 
 // 현재 선택된 재생목록 정보
-let selectedPlaylist: { id: string; title: string; description: string; privacyStatus: string } | null = null;
+let selectedPlaylist: {
+  id: string;
+  title: string;
+  description: string;
+  privacyStatus: string;
+} | null = null;
+
+// ✅ 로컬에서 제거 대기 중인 playlistItemId 목록
+let pendingRemovals: string[] = [];
 
 const PLAYLIST_ITEM_HEIGHT = 41;
 const PLAYLIST_ITEM_GAP = 4;
@@ -153,6 +161,7 @@ function switchToTempListMode(): void {
   tempListMode.classList.remove("hidden");
   playlistEditMode.classList.add("hidden");
   selectedPlaylist = null;
+  pendingRemovals = [];
 
   formTitleText.textContent = "재생목록 생성";
   submitPlaylistBtn.textContent = "재생목록 생성";
@@ -163,10 +172,14 @@ function switchToTempListMode(): void {
 }
 
 // ✅ 재생목록 수정 모드로 전환
-function switchToEditMode(
-  playlist: { id: string; title: string; description: string; privacyStatus: string }
-): void {
+function switchToEditMode(playlist: {
+  id: string;
+  title: string;
+  description: string;
+  privacyStatus: string;
+}): void {
   selectedPlaylist = playlist;
+  pendingRemovals = [];
   tempListMode.classList.add("hidden");
   playlistEditMode.classList.remove("hidden");
 
@@ -182,17 +195,15 @@ function switchToEditMode(
 
 function updateSubmitBtn(): void {
   if (selectedPlaylist) {
-    // 수정 모드: 제목만 있으면 활성화
     submitPlaylistBtn.disabled = playlistTitleInput.value.trim().length === 0;
   } else {
-    // 생성 모드: 영상 + 제목 필요
     const hasVideos = currentTempList.length > 0;
     const hasTitle = playlistTitleInput.value.trim().length > 0;
     submitPlaylistBtn.disabled = !hasVideos || !hasTitle;
   }
 }
 
-// ✅ 재생목록 내 영상 목록 렌더링
+// ✅ 재생목록 내 영상 목록 렌더링 (로컬 제거 대기 반영)
 function renderPlaylistItems(items: PlaylistItem[]): void {
   playlistItemsContainer.innerHTML = "";
 
@@ -207,6 +218,12 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
   items.forEach((item) => {
     const row = document.createElement("div");
     row.className = "playlist-video-item";
+    row.dataset.playlistItemId = item.playlistItemId;
+
+    // ✅ 제거 대기 중인 영상은 취소선 표시
+    if (pendingRemovals.includes(item.playlistItemId)) {
+      row.classList.add("pending-removal");
+    }
 
     const thumbnail = document.createElement("img");
     thumbnail.className = "playlist-video-thumbnail";
@@ -223,10 +240,20 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "playlist-video-remove-btn";
-    removeBtn.textContent = "✕";
+    removeBtn.textContent = pendingRemovals.includes(item.playlistItemId) ? "↩" : "✕";
     removeBtn.setAttribute("aria-label", `${item.title} 제거`);
-    removeBtn.addEventListener("click", async () => {
-      await handleRemovePlaylistItem(item.playlistItemId, removeBtn);
+
+    // ✅ 즉시 API 호출 대신 로컬에서만 토글
+    removeBtn.addEventListener("click", () => {
+      if (pendingRemovals.includes(item.playlistItemId)) {
+        // 제거 취소
+        pendingRemovals = pendingRemovals.filter((id) => id !== item.playlistItemId);
+      } else {
+        // 제거 예약
+        pendingRemovals.push(item.playlistItemId);
+      }
+      row.classList.toggle("pending-removal");
+      removeBtn.textContent = pendingRemovals.includes(item.playlistItemId) ? "↩" : "✕";
     });
 
     row.appendChild(thumbnail);
@@ -236,42 +263,11 @@ function renderPlaylistItems(items: PlaylistItem[]): void {
   });
 }
 
-// ✅ 재생목록 내 영상 제거
-async function handleRemovePlaylistItem(
-  playlistItemId: string,
-  btn: HTMLButtonElement
-): Promise<void> {
-  try {
-    btn.disabled = true;
-    btn.textContent = "...";
-
-    const response: MessageResponse = await chrome.runtime.sendMessage({
-      type: "REMOVE_FROM_PLAYLIST",
-      payload: { playlistItemId },
-    });
-
-    if (response.success) {
-      renderPlaylists(response.playlists ?? []);
-      // 현재 선택된 재생목록 영상 목록 재조회
-      if (selectedPlaylist) {
-        await loadPlaylistItems(selectedPlaylist.id);
-      }
-    } else {
-      alert(`제거 실패: ${response.error}`);
-      btn.disabled = false;
-      btn.textContent = "✕";
-    }
-  } catch (error) {
-    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
-    btn.disabled = false;
-    btn.textContent = "✕";
-  }
-}
-
 // ✅ 재생목록 내 영상 목록 조회
 async function loadPlaylistItems(playlistId: string): Promise<void> {
   playlistItemsContainer.innerHTML =
     `<p class="playlist-video-loading">불러오는 중...</p>`;
+  pendingRemovals = [];
 
   try {
     const response = await chrome.runtime.sendMessage({
@@ -340,7 +336,6 @@ function renderPlaylists(
 
     // ✅ 재생목록 클릭 시 수정 모드 전환
     item.addEventListener("click", async () => {
-      // ✅ 실제 description, privacyStatus 전달
       switchToEditMode({
         id: playlist.id,
         title: playlist.title,
@@ -434,6 +429,7 @@ function showLoginView(): void {
   isDraggedManually = false;
   userTempRatio = 0;
   selectedPlaylist = null;
+  pendingRemovals = [];
 }
 
 async function showMainView(userId: string): Promise<void> {
@@ -447,10 +443,6 @@ async function showMainView(userId: string): Promise<void> {
   userInfo.textContent = displayName ?? `채널 ID: ${userId}`;
 
   await Promise.all([loadTempList(), loadPlaylists()]);
-}
-
-function resetForm(): void {
-  switchToTempListMode();
 }
 
 async function init(): Promise<void> {
@@ -475,7 +467,6 @@ async function init(): Promise<void> {
   }
 }
 
-// 뒤로가기 버튼
 backBtn.addEventListener("click", () => {
   switchToTempListMode();
 });
@@ -502,6 +493,15 @@ submitPlaylistBtn.addEventListener("click", async () => {
       submitPlaylistBtn.disabled = true;
       submitPlaylistBtn.textContent = "수정 중...";
 
+      // ✅ 제거 대기 중인 영상 일괄 삭제
+      for (const playlistItemId of pendingRemovals) {
+        await chrome.runtime.sendMessage({
+          type: "REMOVE_FROM_PLAYLIST",
+          payload: { playlistItemId },
+        });
+      }
+
+      // ✅ 재생목록 정보 수정
       const response: MessageResponse = await chrome.runtime.sendMessage({
         type: "UPDATE_PLAYLIST",
         payload: {
@@ -539,7 +539,7 @@ submitPlaylistBtn.addEventListener("click", async () => {
     });
 
     if (response.success) {
-      resetForm();
+      switchToTempListMode();
       renderPlaylists(response.playlists ?? []);
     } else {
       alert(`재생목록 생성 실패: ${response.error}`);

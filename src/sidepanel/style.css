@@ -492,3 +492,13 @@ button {
   text-align: center;
   padding: 12px 0;
 }
+
+/* 제거 대기 중인 영상 */
+.playlist-video-item.pending-removal {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.playlist-video-item.pending-removal .playlist-video-remove-btn {
+  color: #4285f4;
+}
