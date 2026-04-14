@@ -41,7 +41,6 @@ let selectedPlaylist: {
   privacyStatus: string;
 } | null = null;
 
-// ✅ 로컬에서 제거 대기 중인 playlistItemId 목록
 let pendingRemovals: string[] = [];
 
 const PLAYLIST_ITEM_HEIGHT = 41;
@@ -482,12 +481,26 @@ submitPlaylistBtn.addEventListener("click", async () => {
       submitPlaylistBtn.disabled = true;
       submitPlaylistBtn.textContent = "수정 중...";
 
-      // ✅ 제거 대기 중인 영상 일괄 삭제
-      for (const playlistItemId of pendingRemovals) {
-        await chrome.runtime.sendMessage({
-          type: "REMOVE_FROM_PLAYLIST",
-          payload: { playlistItemId },
+      // ✅ 일괄 제거 메시지로 변경 - 응답 확인 후 실패 시 중단
+      if (pendingRemovals.length > 0) {
+        const removeResponse: MessageResponse = await chrome.runtime.sendMessage({
+          type: "REMOVE_PLAYLIST_ITEMS_BATCH",
+          payload: {
+            playlistId: selectedPlaylist.id,
+            playlistItemIds: pendingRemovals,
+          },
         });
+
+        if (!removeResponse.success) {
+          alert(`영상 제거 실패: ${removeResponse.error}`);
+          submitPlaylistBtn.disabled = false;
+          return;
+        }
+
+        // ✅ 일부 실패 시 사용자에게 알림 (전체 실패는 위에서 처리)
+        if (removeResponse.error) {
+          alert(`일부 영상 제거 실패: ${removeResponse.error}`);
+        }
       }
 
       // ✅ 재생목록 정보 수정
@@ -498,12 +511,11 @@ submitPlaylistBtn.addEventListener("click", async () => {
           title,
           description,
           privacyStatus,
-          removedCount: pendingRemovals.length, // ✅ 제거된 영상 수 전달
+          removedCount: pendingRemovals.length,
         },
       });
 
       if (response.success) {
-        // ✅ loadPlaylists로 캐시 갱신 없이 현재 목록 유지
         await loadPlaylists();
         switchToTempListMode();
       } else {

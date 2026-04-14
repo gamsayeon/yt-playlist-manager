@@ -68,7 +68,6 @@ async function updateAndRefreshPlaylists(
   });
 }
 
-// ✅ 캐시에서 특정 재생목록 itemCount 직접 수정
 async function updateCachedItemCount(
   playlistId: string,
   delta: number
@@ -222,9 +221,9 @@ export function registerMessageHandler(): void {
             throw error;
           }
 
+          // ✅ 루프 후 한 번만 clearTempList 호출
           await clearTempList();
 
-          // ✅ 캐시에 새 재생목록 추가
           const cached = await getCachedPlaylists();
           const newPlaylist: Playlist = {
             id: playlist.id,
@@ -268,7 +267,6 @@ export function registerMessageHandler(): void {
             validatedPrivacyStatus
           );
 
-          // ✅ 캐시에서 해당 재생목록 직접 수정
           const cached = await getCachedPlaylists();
           let playlists: Playlist[];
           if (cached) {
@@ -318,12 +316,12 @@ export function registerMessageHandler(): void {
             throw new Error("추가할 영상이 없습니다.");
           }
 
+          // ✅ 루프 내에서는 추가만, 루프 후 clearTempList 한 번 호출
           for (const video of tempItems) {
             await addItemToPlaylist(playlistId, video.videoId);
-            await removeFromTempList(video.videoId);
           }
+          await clearTempList();
 
-          // ✅ 캐시에서 itemCount 직접 증가
           const updated = await updateCachedItemCount(playlistId, tempItems.length);
           let playlists: Playlist[];
           if (updated) {
@@ -348,6 +346,46 @@ export function registerMessageHandler(): void {
           () => addItemToPlaylist(playlistId, videoId),
           sendResponse
         );
+        return true;
+      }
+
+      // ✅ 일괄 제거 메시지 타입 추가
+      case "REMOVE_PLAYLIST_ITEMS_BATCH": {
+        const { playlistId, playlistItemIds } = message.payload ?? {};
+        if (!playlistId || !Array.isArray(playlistItemIds) || playlistItemIds.length === 0) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const errors: string[] = [];
+
+          for (const playlistItemId of playlistItemIds) {
+            try {
+              await removeItemFromPlaylist(playlistItemId);
+            } catch (error) {
+              errors.push(playlistItemId);
+              console.error("[YTPM] 영상 제거 실패:", playlistItemId, error);
+            }
+          }
+
+          if (errors.length > 0 && errors.length === playlistItemIds.length) {
+            throw new Error("모든 영상 제거에 실패했습니다.");
+          }
+
+          // ✅ 성공한 항목 수만큼 캐시 itemCount 차감
+          const successCount = playlistItemIds.length - errors.length;
+          const updated = await updateCachedItemCount(playlistId, -successCount);
+          const playlists = updated ?? (await getPlaylists());
+          if (!updated) await setCachedPlaylists(playlists);
+
+          sendResponse({
+            success: true,
+            playlists,
+            error: errors.length > 0
+              ? `${errors.length}개 영상 제거 실패`
+              : undefined,
+          });
+        });
         return true;
       }
 
