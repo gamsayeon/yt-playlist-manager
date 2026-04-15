@@ -130,12 +130,15 @@ export async function getPlaylists(): Promise<Playlist[]> {
   return playlists;
 }
 
-export async function getPlaylistItems(playlistId: string): Promise<PlaylistItem[]> {
+export async function getPlaylistItems(
+  playlistId: string,
+  maxResults: number = 50
+): Promise<PlaylistItem[]> {
   const items: PlaylistItem[] = [];
   let pageToken: string | undefined;
 
   do {
-    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50${
+    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
 
@@ -156,7 +159,7 @@ export async function getPlaylistItems(playlistId: string): Promise<PlaylistItem
     });
 
     pageToken = data.nextPageToken;
-  } while (pageToken);
+  } while (pageToken && items.length < maxResults);
 
   return items;
 }

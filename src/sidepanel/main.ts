@@ -256,10 +256,10 @@ function applyAndRender(): void {
       list.sort((a, b) => a.itemCount - b.itemCount);
       break;
     case "date-desc":
-      list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+      list.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)); // ✅ Date 객체 제거
       break;
     case "date-asc":
-      list.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
+      list.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt)); // ✅ Date 객체 제거
       break;
     default:
       break;
@@ -432,7 +432,7 @@ async function handlePlayPlaylist(
 
     const response = await chrome.runtime.sendMessage({
       type: "GET_PLAYLIST_ITEMS",
-      payload: { playlistId },
+      payload: { playlistId, maxResults: 1 }, // ✅ maxResults: 1 추가
     });
 
     if (response.success && response.playlistItems?.length > 0) {
