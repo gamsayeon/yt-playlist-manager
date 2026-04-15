@@ -526,3 +526,27 @@ button {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* 재생목록 재생 버튼 */
+.playlist-item-play-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background-color: #ff0000;
+  color: white;
+  font-size: 11px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playlist-item-play-btn:hover:not(:disabled) {
+  background-color: #cc0000;
+}
+
+.playlist-item-play-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

@@ -277,7 +277,6 @@ async function loadPlaylistItems(playlistId: string): Promise<void> {
   }
 }
 
-// ✅ playlistTitle 파라미터 제거
 async function handleDeletePlaylist(
   playlistId: string,
   btn: HTMLButtonElement
@@ -292,7 +291,6 @@ async function handleDeletePlaylist(
     });
 
     if (response.success) {
-      // ✅ 현재 수정 중인 재생목록이 삭제된 경우 임시 리스트 모드로 전환
       if (selectedPlaylist?.id === playlistId) {
         switchToTempListMode();
       }
@@ -306,6 +304,35 @@ async function handleDeletePlaylist(
     alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
     btn.disabled = false;
     btn.textContent = "🗑";
+  }
+}
+
+// ✅ 재생목록 재생 버튼 핸들러
+async function handlePlayPlaylist(
+  playlistId: string,
+  btn: HTMLButtonElement
+): Promise<void> {
+  try {
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    const response = await chrome.runtime.sendMessage({
+      type: "GET_PLAYLIST_ITEMS",
+      payload: { playlistId },
+    });
+
+    if (response.success && response.playlistItems?.length > 0) {
+      const firstVideoId = response.playlistItems[0].videoId;
+      const url = `https://www.youtube.com/watch?v=${firstVideoId}&list=${playlistId}`;
+      chrome.tabs.create({ url });
+    } else {
+      alert("재생할 영상이 없습니다.");
+    }
+  } catch (error) {
+    alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "▶";
   }
 }
 
@@ -342,6 +369,17 @@ function renderPlaylists(
     count.className = "playlist-item-count";
     count.textContent = `${playlist.itemCount}개`;
 
+    // ✅ 재생 버튼
+    const playBtn = document.createElement("button");
+    playBtn.className = "playlist-item-play-btn";
+    playBtn.textContent = "▶";
+    playBtn.title = "재생목록 재생";
+    playBtn.setAttribute("aria-label", `"${playlist.title}" 재생`);
+    playBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await handlePlayPlaylist(playlist.id, playBtn);
+    });
+
     const addBtn = document.createElement("button");
     addBtn.className = "playlist-item-add-btn";
     addBtn.textContent = "+";
@@ -352,24 +390,22 @@ function renderPlaylists(
       await handleAddTempToPlaylist(playlist.id, playlist.title, addBtn);
     });
 
-    // ✅ 삭제 버튼
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "playlist-item-delete-btn";
     deleteBtn.textContent = "🗑";
     deleteBtn.title = "재생목록 삭제";
-    // ✅ aria-label 추가
     deleteBtn.setAttribute("aria-label", `"${playlist.title}" 재생목록 삭제`);
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!confirm(`"${playlist.title}" 재생목록을 삭제할까요?\n삭제된 재생목록은 복구할 수 없습니다.`)) {
         return;
       }
-      // ✅ playlistTitle 파라미터 제거
       void handleDeletePlaylist(playlist.id, deleteBtn);
     });
 
     item.appendChild(title);
     item.appendChild(count);
+    item.appendChild(playBtn);
     item.appendChild(addBtn);
     item.appendChild(deleteBtn);
 
