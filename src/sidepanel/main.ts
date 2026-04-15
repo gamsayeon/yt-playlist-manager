@@ -2,6 +2,7 @@ import { MessageResponse } from "../types/message";
 import { VideoItem } from "../types";
 import { TempList } from "../components/TempList";
 import { PlaylistItem } from "../background/youtube-api";
+import { Playlist } from "../background/storage";
 
 const loginView = document.getElementById("login-view") as HTMLDivElement;
 const mainView = document.getElementById("main-view") as HTMLDivElement;
@@ -38,14 +39,7 @@ const tempList = new TempList(tempListContainer);
 
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
-let cachedPlaylists: {
-  id: string;
-  title: string;
-  description: string;
-  privacyStatus: string;
-  itemCount: number;
-  publishedAt: string;
-}[] = [];
+let cachedPlaylists: Playlist[] = [];
 
 let currentSort = "date-desc";
 let currentFilter = "all";

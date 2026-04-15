@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
           ...(env.VITE_EXTENSION_KEY ? { key: env.VITE_EXTENSION_KEY } : {}),
           oauth2: {
             ...manifest.oauth2,
-            ...(env.VITE_OAUTH_CLIENT_ID ? { client_id: env.VITE_OAUTH_CLIENT_ID } : manifest.oauth2.client_id ? {} : {}),
+            // ✅ 불필요한 조건 제거
+            ...(env.VITE_OAUTH_CLIENT_ID ? { client_id: env.VITE_OAUTH_CLIENT_ID } : {}),
           },
         }),
       }),

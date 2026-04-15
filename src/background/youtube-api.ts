@@ -15,7 +15,7 @@ interface YouTubePlaylistItem {
   snippet: {
     title: string;
     description: string;
-    publishedAt: string; // ✅ 추가
+    publishedAt: string;
   };
   contentDetails: {
     itemCount: number;
@@ -120,7 +120,7 @@ export async function getPlaylists(): Promise<Playlist[]> {
         description: item.snippet.description,
         privacyStatus: item.status.privacyStatus,
         itemCount: item.contentDetails.itemCount,
-        publishedAt: item.snippet.publishedAt, // ✅ 추가
+        publishedAt: item.snippet.publishedAt,
       });
     });
 
@@ -130,16 +130,19 @@ export async function getPlaylists(): Promise<Playlist[]> {
   return playlists;
 }
 
+// ✅ maxResults 선택적 파라미터로 변경 - 미지정 시 전체 조회
 export async function getPlaylistItems(
   playlistId: string,
-  maxResults: number = 50
+  maxResults?: number
 ): Promise<PlaylistItem[]> {
   const items: PlaylistItem[] = [];
   let pageToken: string | undefined;
 
   do {
-    // ✅ YouTube API 최대값 50 초과 방지
-    const clampedMaxResults = Math.min(maxResults, 50);
+    // ✅ 요청된 개수에 맞춰 API 호출 제한 (미지정 시 전체)
+    const remaining = maxResults !== undefined ? maxResults - items.length : Infinity;
+    const clampedMaxResults = Math.min(remaining, 50);
+
     const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${clampedMaxResults}${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
@@ -161,7 +164,7 @@ export async function getPlaylistItems(
     });
 
     pageToken = data.nextPageToken;
-  } while (pageToken && items.length < maxResults);
+  } while (pageToken && (maxResults === undefined || items.length < maxResults));
 
   return items;
 }
@@ -187,7 +190,7 @@ export async function createPlaylist(
     description: data.snippet.description,
     privacyStatus: data.status?.privacyStatus ?? "private",
     itemCount: data.contentDetails?.itemCount ?? 0,
-    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(), // ✅ 추가
+    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(),
   };
 }
 
@@ -214,7 +217,7 @@ export async function updatePlaylist(
     description: data.snippet.description,
     privacyStatus: data.status?.privacyStatus ?? privacyStatus,
     itemCount: data.contentDetails?.itemCount ?? 0,
-    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(), // ✅ 추가
+    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(),
   };
 }
 
