@@ -15,6 +15,7 @@ interface YouTubePlaylistItem {
   snippet: {
     title: string;
     description: string;
+    publishedAt: string; // ✅ 추가
   };
   contentDetails: {
     itemCount: number;
@@ -34,6 +35,7 @@ interface YouTubePlaylistSingleResponse {
   snippet: {
     title: string;
     description: string;
+    publishedAt?: string;
   };
   contentDetails?: {
     itemCount: number;
@@ -99,7 +101,6 @@ async function fetchWithAuth(
   return response;
 }
 
-// ✅ description, privacyStatus 포함하여 조회
 export async function getPlaylists(): Promise<Playlist[]> {
   const playlists: Playlist[] = [];
   let pageToken: string | undefined;
@@ -119,6 +120,7 @@ export async function getPlaylists(): Promise<Playlist[]> {
         description: item.snippet.description,
         privacyStatus: item.status.privacyStatus,
         itemCount: item.contentDetails.itemCount,
+        publishedAt: item.snippet.publishedAt, // ✅ 추가
       });
     });
 
@@ -180,10 +182,10 @@ export async function createPlaylist(
     description: data.snippet.description,
     privacyStatus: data.status?.privacyStatus ?? "private",
     itemCount: data.contentDetails?.itemCount ?? 0,
+    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(), // ✅ 추가
   };
 }
 
-// ✅ contentDetails 추가로 itemCount 정상 반환
 export async function updatePlaylist(
   playlistId: string,
   title: string,
@@ -207,6 +209,7 @@ export async function updatePlaylist(
     description: data.snippet.description,
     privacyStatus: data.status?.privacyStatus ?? privacyStatus,
     itemCount: data.contentDetails?.itemCount ?? 0,
+    publishedAt: data.snippet.publishedAt ?? new Date().toISOString(), // ✅ 추가
   };
 }
 

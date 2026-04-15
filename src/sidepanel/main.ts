@@ -29,10 +29,26 @@ const playlistEditTitle = document.getElementById("playlist-edit-title") as HTML
 const playlistItemsContainer = document.getElementById("playlist-items-container") as HTMLDivElement;
 const backBtn = document.getElementById("back-btn") as HTMLButtonElement;
 
+const sortBtn = document.getElementById("sort-btn") as HTMLButtonElement;
+const sortDropdown = document.getElementById("sort-dropdown") as HTMLUListElement;
+const filterBtn = document.getElementById("filter-btn") as HTMLButtonElement;
+const filterDropdown = document.getElementById("filter-dropdown") as HTMLUListElement;
+
 const tempList = new TempList(tempListContainer);
 
 let currentTempList: VideoItem[] = [];
 let isInitialized = false;
+let cachedPlaylists: {
+  id: string;
+  title: string;
+  description: string;
+  privacyStatus: string;
+  itemCount: number;
+  publishedAt: string;
+}[] = [];
+
+let currentSort = "default";
+let currentFilter = "all";
 
 let selectedPlaylist: {
   id: string;
@@ -152,6 +168,104 @@ function initDivider(): void {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   });
+}
+
+// ✅ 드롭다운 위치 계산 (공간 부족 시 위로)
+function positionDropdown(btn: HTMLButtonElement, dropdown: HTMLUListElement): void {
+  const rect = btn.getBoundingClientRect();
+  const dropdownHeight = Math.min(200, dropdown.scrollHeight);
+  const spaceBelow = window.innerHeight - rect.bottom;
+
+  if (spaceBelow < dropdownHeight) {
+    dropdown.style.top = `${rect.top - dropdownHeight - 4}px`;
+  } else {
+    dropdown.style.top = `${rect.bottom + 4}px`;
+  }
+
+  dropdown.style.left = "auto";
+  dropdown.style.right = `${window.innerWidth - rect.right}px`;
+}
+
+function initDropdowns(): void {
+  sortBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sortDropdown.classList.toggle("hidden");
+    filterDropdown.classList.add("hidden");
+    if (!sortDropdown.classList.contains("hidden")) {
+      positionDropdown(sortBtn, sortDropdown);
+    }
+  });
+
+  sortDropdown.querySelectorAll("li").forEach((li) => {
+    li.addEventListener("click", () => {
+      currentSort = li.dataset.sort ?? "default";
+      sortBtn.textContent = `${li.textContent} ▾`;
+      sortDropdown.classList.add("hidden");
+      sortDropdown.querySelectorAll("li").forEach((l) => l.classList.remove("active"));
+      li.classList.add("active");
+      applyAndRender();
+    });
+  });
+
+  filterBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    filterDropdown.classList.toggle("hidden");
+    sortDropdown.classList.add("hidden");
+    if (!filterDropdown.classList.contains("hidden")) {
+      positionDropdown(filterBtn, filterDropdown);
+    }
+  });
+
+  filterDropdown.querySelectorAll("li").forEach((li) => {
+    li.addEventListener("click", () => {
+      currentFilter = li.dataset.filter ?? "all";
+      filterBtn.textContent = `${li.textContent} ▾`;
+      filterDropdown.classList.add("hidden");
+      filterDropdown.querySelectorAll("li").forEach((l) => l.classList.remove("active"));
+      li.classList.add("active");
+      applyAndRender();
+    });
+  });
+
+  document.addEventListener("click", () => {
+    sortDropdown.classList.add("hidden");
+    filterDropdown.classList.add("hidden");
+  });
+}
+
+function applyAndRender(): void {
+  let list = [...cachedPlaylists];
+
+  if (currentFilter === "public") {
+    list = list.filter((p) => p.privacyStatus === "public");
+  } else if (currentFilter === "private") {
+    list = list.filter((p) => p.privacyStatus === "private");
+  }
+
+  switch (currentSort) {
+    case "title-asc":
+      list.sort((a, b) => a.title.localeCompare(b.title, "ko"));
+      break;
+    case "title-desc":
+      list.sort((a, b) => b.title.localeCompare(a.title, "ko"));
+      break;
+    case "count-desc":
+      list.sort((a, b) => b.itemCount - a.itemCount);
+      break;
+    case "count-asc":
+      list.sort((a, b) => a.itemCount - b.itemCount);
+      break;
+    case "date-desc":
+      list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+      break;
+    case "date-asc":
+      list.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
+      break;
+    default:
+      break;
+  }
+
+  renderPlaylists(list);
 }
 
 function switchToTempListMode(): void {
@@ -294,7 +408,8 @@ async function handleDeletePlaylist(
       if (selectedPlaylist?.id === playlistId) {
         switchToTempListMode();
       }
-      renderPlaylists(response.playlists ?? []);
+      cachedPlaylists = response.playlists ?? [];
+      applyAndRender();
     } else {
       alert(`삭제 실패: ${response.error}`);
       btn.disabled = false;
@@ -307,7 +422,6 @@ async function handleDeletePlaylist(
   }
 }
 
-// ✅ 재생목록 재생 버튼 핸들러
 async function handlePlayPlaylist(
   playlistId: string,
   btn: HTMLButtonElement
@@ -343,6 +457,7 @@ function renderPlaylists(
     description: string;
     privacyStatus: string;
     itemCount: number;
+    publishedAt: string;
   }[]
 ): void {
   playlistListContainer.innerHTML = "";
@@ -369,7 +484,6 @@ function renderPlaylists(
     count.className = "playlist-item-count";
     count.textContent = `${playlist.itemCount}개`;
 
-    // ✅ 재생 버튼
     const playBtn = document.createElement("button");
     playBtn.className = "playlist-item-play-btn";
     playBtn.textContent = "▶";
@@ -447,7 +561,8 @@ async function handleAddTempToPlaylist(
     });
 
     if (response.success) {
-      renderPlaylists(response.playlists ?? []);
+      cachedPlaylists = response.playlists ?? [];
+      applyAndRender();
     } else {
       alert(`추가 실패: ${response.error}`);
     }
@@ -469,7 +584,8 @@ async function loadPlaylists(forceRefresh = false): Promise<void> {
     });
 
     if (response.success) {
-      renderPlaylists(response.playlists ?? []);
+      cachedPlaylists = response.playlists ?? [];
+      applyAndRender();
     } else {
       console.error("[YT Playlist Manager] 재생목록 로드 실패:", response.error);
     }
@@ -504,6 +620,7 @@ function showLoginView(): void {
   userTempRatio = 0;
   selectedPlaylist = null;
   pendingRemovals = [];
+  cachedPlaylists = [];
 }
 
 async function showMainView(userId: string): Promise<void> {
@@ -525,6 +642,7 @@ async function init(): Promise<void> {
 
   initDivider();
   initResizeHandler();
+  initDropdowns();
 
   try {
     const { userId } = await chrome.storage.local.get("userId");
@@ -596,7 +714,8 @@ submitPlaylistBtn.addEventListener("click", async () => {
       });
 
       if (response.success) {
-        await loadPlaylists();
+        cachedPlaylists = response.playlists ?? [];
+        applyAndRender();
         switchToTempListMode();
       } else {
         alert(`수정 실패: ${response.error}`);
@@ -621,8 +740,9 @@ submitPlaylistBtn.addEventListener("click", async () => {
     });
 
     if (response.success) {
+      cachedPlaylists = response.playlists ?? [];
+      applyAndRender();
       switchToTempListMode();
-      renderPlaylists(response.playlists ?? []);
     } else {
       alert(`재생목록 생성 실패: ${response.error}`);
       submitPlaylistBtn.disabled = false;
