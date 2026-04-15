@@ -186,15 +186,25 @@ export function registerMessageHandler(): void {
       }
 
       case "GET_PLAYLIST_ITEMS_FOR_TEMP": {
-        const { playlistId } = message.payload ?? {};
+        const { playlistId, isOwnChannel } = message.payload ?? {};
         if (!playlistId) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
         handleAsync(sendResponse, async () => {
-          const playlistItems = await getPlaylistItems(playlistId);
-          console.log("[YTPM] 재생목록 영상 조회 결과:", playlistItems);
-          sendResponse({ success: true, playlistItems });
+          const allItems = await getPlaylistItems(playlistId);
+
+          // ✅ 본인 채널이면 전체, 아니면 private 제외
+          const filtered = isOwnChannel
+            ? allItems
+            : allItems.filter((item) => {
+                // PlaylistItem에 privacyStatus가 없으므로
+                // title이 "Private video"인 항목 제외
+                return item.title !== "Private video" && item.title !== "Deleted video";
+              });
+
+          console.log("[YTPM] 재생목록 영상 조회 결과:", filtered);
+          sendResponse({ success: true, playlistItems: filtered });
         });
         return true;
       }

@@ -93,15 +93,25 @@ async function handlePlaylistCheck(
 ): Promise<void> {
   if (!checked) return;
 
+  // ✅ storage에서 userHandle 조회
+  const { userHandle } = await chrome.storage.local.get("userHandle");
+
+  const isOwnChannel =
+    location.pathname === "/feed/playlists" ||
+    (!!userHandle && location.pathname.startsWith(`/${userHandle}/`));
+
   try {
     const response = await chrome.runtime.sendMessage({
       type: "GET_PLAYLIST_ITEMS_FOR_TEMP",
-      payload: { playlistId },
+      payload: { playlistId, isOwnChannel },
     });
 
     if (!response.success) {
       console.error("[YT Playlist Manager] 재생목록 영상 조회 실패:", response.error);
+      return;
     }
+
+    console.log("[YT Playlist Manager] 조회된 영상:", response.playlistItems);
   } catch (error) {
     console.error("[YT Playlist Manager] 재생목록 영상 조회 오류:", error);
   }
