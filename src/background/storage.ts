@@ -17,6 +17,7 @@ export interface Playlist {
   description: string;
   privacyStatus: string;
   itemCount: number;
+  publishedAt: string;
 }
 
 const TTL_MS = 5 * 60 * 1000; // 5분

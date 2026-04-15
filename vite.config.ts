@@ -10,9 +10,11 @@ export default defineConfig(({ mode }) => {
       webExtension({
         manifest: () => ({
           ...manifest,
+          ...(env.VITE_EXTENSION_KEY ? { key: env.VITE_EXTENSION_KEY } : {}),
           oauth2: {
             ...manifest.oauth2,
-            client_id: env.VITE_OAUTH_CLIENT_ID || "",
+            // ✅ 불필요한 조건 제거
+            ...(env.VITE_OAUTH_CLIENT_ID ? { client_id: env.VITE_OAUTH_CLIENT_ID } : {}),
           },
         }),
       }),

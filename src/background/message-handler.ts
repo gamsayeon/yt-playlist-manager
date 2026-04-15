@@ -173,13 +173,13 @@ export function registerMessageHandler(): void {
         return true;
 
       case "GET_PLAYLIST_ITEMS": {
-        const { playlistId } = message.payload ?? {};
+        const { playlistId, maxResults } = message.payload ?? {};
         if (!playlistId) {
           sendResponse({ success: false, error: "Invalid payload" });
           return true;
         }
         handleAsync(sendResponse, async () => {
-          const playlistItems = await getPlaylistItems(playlistId);
+          const playlistItems = await getPlaylistItems(playlistId, maxResults);
           sendResponse({ success: true, playlistItems });
         });
         return true;
@@ -230,6 +230,7 @@ export function registerMessageHandler(): void {
             description: playlist.description,
             privacyStatus: playlist.privacyStatus,
             itemCount: tempItems.length,
+            publishedAt: playlist.publishedAt,
           };
 
           let playlists: Playlist[];
