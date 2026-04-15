@@ -185,6 +185,20 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      case "GET_PLAYLIST_ITEMS_FOR_TEMP": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const playlistItems = await getPlaylistItems(playlistId);
+          console.log("[YTPM] 재생목록 영상 조회 결과:", playlistItems);
+          sendResponse({ success: true, playlistItems });
+        });
+        return true;
+      }
+
       case "CREATE_PLAYLIST": {
         const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
