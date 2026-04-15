@@ -138,7 +138,9 @@ export async function getPlaylistItems(
   let pageToken: string | undefined;
 
   do {
-    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}${
+    // ✅ YouTube API 최대값 50 초과 방지
+    const clampedMaxResults = Math.min(maxResults, 50);
+    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${clampedMaxResults}${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
 

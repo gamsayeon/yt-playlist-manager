@@ -47,7 +47,7 @@ let cachedPlaylists: {
   publishedAt: string;
 }[] = [];
 
-let currentSort = "default";
+let currentSort = "date-desc";
 let currentFilter = "all";
 
 let selectedPlaylist: {
@@ -187,6 +187,10 @@ function positionDropdown(btn: HTMLButtonElement, dropdown: HTMLUListElement): v
 }
 
 function initDropdowns(): void {
+  // ✅ 드롭다운 내부 클릭 시 이벤트 전파 방지
+  sortDropdown.addEventListener("click", (e) => e.stopPropagation());
+  filterDropdown.addEventListener("click", (e) => e.stopPropagation());
+
   sortBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     sortDropdown.classList.toggle("hidden");
@@ -198,7 +202,7 @@ function initDropdowns(): void {
 
   sortDropdown.querySelectorAll("li").forEach((li) => {
     li.addEventListener("click", () => {
-      currentSort = li.dataset.sort ?? "default";
+      currentSort = li.dataset.sort ?? "date-desc";
       sortBtn.textContent = `${li.textContent} ▾`;
       sortDropdown.classList.add("hidden");
       sortDropdown.querySelectorAll("li").forEach((l) => l.classList.remove("active"));
@@ -228,6 +232,12 @@ function initDropdowns(): void {
   });
 
   document.addEventListener("click", () => {
+    sortDropdown.classList.add("hidden");
+    filterDropdown.classList.add("hidden");
+  });
+
+  // ✅ resize 시 드롭다운 닫기
+  window.addEventListener("resize", () => {
     sortDropdown.classList.add("hidden");
     filterDropdown.classList.add("hidden");
   });

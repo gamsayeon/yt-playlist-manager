@@ -10,10 +10,10 @@ export default defineConfig(({ mode }) => {
       webExtension({
         manifest: () => ({
           ...manifest,
-          key: env.VITE_EXTENSION_KEY || "",
+          ...(env.VITE_EXTENSION_KEY ? { key: env.VITE_EXTENSION_KEY } : {}),
           oauth2: {
             ...manifest.oauth2,
-            client_id: env.VITE_OAUTH_CLIENT_ID || "",
+            ...(env.VITE_OAUTH_CLIENT_ID ? { client_id: env.VITE_OAUTH_CLIENT_ID } : manifest.oauth2.client_id ? {} : {}),
           },
         }),
       }),

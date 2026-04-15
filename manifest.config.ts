@@ -3,7 +3,6 @@ const manifest = {
   name: "YT Playlist Manager",
   version: "0.1.0",
   description: "YouTube 영상을 체크박스로 다중 선택하여 재생목록을 일괄 관리합니다.",
-  key: "",
 
   permissions: ["identity", "storage", "sidePanel"],
 
