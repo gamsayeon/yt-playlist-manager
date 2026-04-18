@@ -2,7 +2,9 @@ import { VideoItem } from "../types";
 import {
   getTempList,
   addToTempList,
+  addToTempListBatch,
   removeFromTempList,
+  removeFromTempListByPlaylistId,
   clearTempList,
   getCachedPlaylists,
   setCachedPlaylists,
@@ -185,6 +187,51 @@ export function registerMessageHandler(): void {
         return true;
       }
 
+      case "GET_PLAYLIST_ITEMS_FOR_TEMP": {
+        const { playlistId, isOwnChannel } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const allItems = await getPlaylistItems(playlistId);
+
+          // ✅ privacyStatus로 필터링 (언어 독립적)
+          const filtered = isOwnChannel
+            ? allItems
+            : allItems.filter((item) => item.privacyStatus !== "private");
+
+          // ✅ 배치 처리로 단일 스토리지 작업
+          await addToTempListBatch(
+            filtered.map((item) => ({
+              videoId: item.videoId,
+              title: item.title,
+              thumbnail: item.thumbnail,
+              playlistId,
+            }))
+          );
+
+          const list = await getTempList();
+          sendResponse({ success: true, playlistItems: filtered, list });
+        });
+        return true;
+      }
+
+      case "REMOVE_PLAYLIST_ITEMS_FROM_TEMP": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          // ✅ 중복 영상 보호 로직 포함한 배치 제거
+          await removeFromTempListByPlaylistId(playlistId);
+          const list = await getTempList();
+          sendResponse({ success: true, list });
+        });
+        return true;
+      }
+
       case "CREATE_PLAYLIST": {
         const { title, description, privacyStatus } = message.payload ?? {};
         if (!title) {
@@ -290,7 +337,6 @@ export function registerMessageHandler(): void {
         return true;
       }
 
-      // ✅ 캐시에서 직접 제거 후 즉시 갱신
       case "DELETE_PLAYLIST": {
         const playlistId = message.payload?.playlistId;
         if (!playlistId) {
@@ -306,7 +352,6 @@ export function registerMessageHandler(): void {
             playlists = cached.filter((p) => p.id !== playlistId);
             await setCachedPlaylists(playlists);
           } else {
-            // ✅ API 최종 일관성 문제 방지 - 조회 후 삭제된 항목 필터링
             const allPlaylists = await getPlaylists();
             playlists = allPlaylists.filter((p) => p.id !== playlistId);
             await setCachedPlaylists(playlists);

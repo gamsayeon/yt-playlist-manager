@@ -14,10 +14,13 @@ import {
   injectWatchShortsCheckbox,
   parseChannelVideoInfo,
   injectChannelCheckbox,
+  parseChannelPlaylistInfo,
+  injectChannelPlaylistCheckbox,
   injectShortsPageCheckbox,
   removeCheckboxes,
 } from "./checkbox";
 import { onMutation } from "./observer";
+import { VideoItem } from "../types";
 
 console.log("[YT Playlist Manager] content script loaded");
 
@@ -28,7 +31,6 @@ function isLiveItem(item: Element): boolean {
   return !!item.querySelector("badge-shape.yt-badge-shape--thumbnail-live");
 }
 
-// ✅ data-ytpm-processed 속성 전체 초기화
 function clearProcessedAttributes(): void {
   document.querySelectorAll("[data-ytpm-processed]").forEach((el) => {
     el.removeAttribute("data-ytpm-processed");
@@ -49,15 +51,16 @@ function getVideoId(item: Element): string | null {
   return link?.href.match(/[?&]v=([^&]+)/)?.[1] ?? null;
 }
 
-// ✅ 채널 비디오 처리까지 통합 - 단일 루프에서 모든 ytd-rich-item-renderer 처리
 function tryInjectRichItem(item: Element): void {
   if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
   if (isLiveItem(item)) return;
 
+  // ✅ 재생목록 카드는 스킵 (yt-lockup-view-model 루프에서 처리)
+  if (item.querySelector(".ytLockupViewModelCollectionStack2")) return;
+
   const processed = (item as HTMLElement).dataset.ytpmProcessed;
   const currentVideoId = getVideoId(item);
 
-  // 같은 videoId로 이미 처리된 요소 → 스킵
   if (processed && processed === currentVideoId) return;
 
   const isShorts = !!item.querySelector("a.shortsLockupViewModelHostEndpoint");
@@ -71,7 +74,6 @@ function tryInjectRichItem(item: Element): void {
     return;
   }
 
-  // 채널 비디오 (ytd-rich-grid-media 포함)
   if (item.querySelector("ytd-rich-grid-media")) {
     const videoInfo = parseChannelVideoInfo(item);
     if (videoInfo) {
@@ -81,11 +83,51 @@ function tryInjectRichItem(item: Element): void {
     return;
   }
 
-  // 일반 홈피드 영상
   const videoInfo = parseHomeVideoInfo(item);
   if (videoInfo) {
     injectHomeVideoCheckbox(item, videoInfo);
     (item as HTMLElement).dataset.ytpmProcessed = videoInfo.videoId;
+  }
+}
+
+// ✅ 채널 재생목록 체크박스 체크 핸들러
+async function handlePlaylistCheck(
+  playlistId: string,
+  checked: boolean
+): Promise<void> {
+  if (!checked) {
+    // ✅ 언체크 시 해당 재생목록 영상 일괄 제거
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "REMOVE_PLAYLIST_ITEMS_FROM_TEMP",
+        payload: { playlistId },
+      });
+      if (!response.success) {
+        console.error("[YT Playlist Manager] 재생목록 영상 제거 실패:", response.error);
+      }
+    } catch (error) {
+      console.error("[YT Playlist Manager] 재생목록 영상 제거 오류:", error);
+    }
+    return;
+  }
+
+  // 기존 체크 로직 유지
+  const { userHandle } = await chrome.storage.local.get("userHandle");
+  const isOwnChannel =
+    location.pathname === "/feed/playlists" ||
+    (!!userHandle && location.pathname.startsWith(`/${userHandle}/`));
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "GET_PLAYLIST_ITEMS_FOR_TEMP",
+      payload: { playlistId, isOwnChannel },
+    });
+
+    if (!response.success) {
+      console.error("[YT Playlist Manager] 재생목록 영상 조회 실패:", response.error);
+    }
+  } catch (error) {
+    console.error("[YT Playlist Manager] 재생목록 영상 조회 오류:", error);
   }
 }
 
@@ -129,6 +171,16 @@ function injectCheckboxes(): void {
   document.querySelectorAll("yt-lockup-view-model").forEach((item) => {
     if (item.closest("ytd-rich-shelf-renderer[has-rounded-box-art-thumbnail-style]")) return;
     if (isLiveItem(item)) return;
+
+    const playlistInfo = parseChannelPlaylistInfo(item);
+    if (playlistInfo) {
+      // ✅ 중복 주입 방지
+      if ((item as HTMLElement).dataset.ytpmProcessed === playlistInfo.playlistId) return;
+      injectChannelPlaylistCheckbox(item, playlistInfo, handlePlaylistCheck);
+      (item as HTMLElement).dataset.ytpmProcessed = playlistInfo.playlistId;
+      return;
+    }
+
     const videoInfo = parseWatchVideoInfo(item);
     if (videoInfo) injectWatchCheckbox(item, videoInfo);
   });
@@ -149,7 +201,6 @@ chrome.storage.local.get("userId").then(({ userId }) => {
 
 onMutation(() => injectCheckboxes());
 
-// ✅ 네비게이션 시 data-ytpm-processed 초기화
 document.addEventListener("yt-navigate-start", () => {
   isNavigating = true;
   removeHomeShortsCheckboxes();
@@ -171,7 +222,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
       isLoggedIn = true;
       removeCheckboxes();
       removeHomeShortsCheckboxes();
-      // ✅ 로그인 상태 변경 시 data-ytpm-processed 초기화
       clearProcessedAttributes();
       injectCheckboxes();
     } else {
@@ -183,7 +233,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 
   if ("tempList" in changes) {
-    const list: { videoId: string }[] = changes.tempList.newValue ?? [];
+    const list: VideoItem[] = changes.tempList.newValue ?? [];
     const checkedIds = new Set(list.map((v) => v.videoId));
 
     document.querySelectorAll("[data-ytpm-checkbox]").forEach((cb) => {
@@ -192,6 +242,18 @@ chrome.storage.onChanged.addListener((changes, area) => {
       if (input && videoId) {
         input.checked = checkedIds.has(videoId);
         (cb as HTMLElement).dataset.checked = String(input.checked);
+      }
+    });
+
+    // ✅ Set으로 O(1) 조회 최적화
+    const playlistIdsInTemp = new Set(
+      list.map((v) => v.playlistId).filter(Boolean)
+    );
+    document.querySelectorAll("[data-ytpm-playlist-checkbox]").forEach((cb) => {
+      const input = cb.querySelector("input") as HTMLInputElement | null;
+      const playlistId = (cb as HTMLElement).dataset.playlistId;
+      if (input && playlistId) {
+        input.checked = playlistIdsInTemp.has(playlistId);
       }
     });
   }

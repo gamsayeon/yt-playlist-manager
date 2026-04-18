@@ -2,6 +2,7 @@ import { clearTempList } from "./storage";
 
 const STORAGE_KEY = "userId";
 const DISPLAY_NAME_KEY = "displayName";
+const HANDLE_KEY = "userHandle";
 
 export async function getAuthToken(interactive: boolean): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,11 +32,10 @@ export async function refreshAuthToken(expiredToken?: string): Promise<string> {
   return getAuthToken(false);
 }
 
-/** YouTube 채널 정보 조회 (id + 채널명) */
 async function fetchUserInfo(
   token: string,
   isRetry = false
-): Promise<{ userId: string; displayName: string }> {
+): Promise<{ userId: string; displayName: string; userHandle: string }> {
   const response = await fetch(
     "https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true",
     {
@@ -62,23 +62,23 @@ async function fetchUserInfo(
   return {
     userId: channel.id,
     displayName: channel.snippet.title,
+    userHandle: channel.snippet.customUrl ?? "",
   };
 }
 
-/** 로그인 */
 export async function login(): Promise<string> {
   const token = await getAuthToken(true);
-  const { userId, displayName } = await fetchUserInfo(token);
+  const { userId, displayName, userHandle } = await fetchUserInfo(token);
 
   await chrome.storage.local.set({
     [STORAGE_KEY]: userId,
     [DISPLAY_NAME_KEY]: displayName,
+    [HANDLE_KEY]: userHandle,
   });
 
   return userId;
 }
 
-/** 로그아웃 */
 export async function logout(): Promise<void> {
   const token = await getAuthToken(false).catch(() => null);
 
@@ -94,6 +94,7 @@ export async function logout(): Promise<void> {
     });
   }
 
-  await chrome.storage.local.remove([STORAGE_KEY, DISPLAY_NAME_KEY]);
+  // ✅ HANDLE_KEY 추가, 기존 토큰 제거 로직 복구
+  await chrome.storage.local.remove([STORAGE_KEY, DISPLAY_NAME_KEY, HANDLE_KEY]);
   await clearTempList();
 }
