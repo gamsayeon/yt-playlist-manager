@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
   CACHED_PLAYLISTS: "cachedPlaylists",
   CACHED_PLAYLISTS_AT: "cachedPlaylistsAt",
   USER_ID: "userId",
-} as const; // ✅ PLAYLIST_VIDEO_IDS 제거
+} as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -58,7 +58,6 @@ export async function addToTempList(video: VideoItem): Promise<void> {
   await operationPromise;
 }
 
-// ✅ 배치 추가
 export async function addToTempListBatch(videos: VideoItem[]): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
@@ -85,35 +84,13 @@ export async function removeFromTempList(videoId: string): Promise<void> {
   await operationPromise;
 }
 
-// ✅ 중복 영상 보호 로직 포함한 배치 제거
+// ✅ 단순 필터링으로 수정 (중복 보호 로직 제거)
 export async function removeFromTempListByPlaylistId(
   playlistId: string
 ): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
-
-    const videoIdsToRemove = new Set(
-      list
-        .filter((item) => item.playlistId === playlistId)
-        .map((item) => item.videoId)
-    );
-
-    // ✅ 다른 재생목록에도 포함된 영상은 보호
-    const protectedIds = new Set(
-      list
-        .filter(
-          (item) =>
-            item.playlistId !== playlistId &&
-            videoIdsToRemove.has(item.videoId)
-        )
-        .map((item) => item.videoId)
-    );
-
-    const filtered = list.filter(
-      (item) =>
-        item.playlistId !== playlistId || protectedIds.has(item.videoId)
-    );
-
+    const filtered = list.filter((item) => item.playlistId !== playlistId);
     if (list.length !== filtered.length) {
       await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
     }

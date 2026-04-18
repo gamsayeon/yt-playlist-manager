@@ -49,7 +49,6 @@ export function parseChannelPlaylistInfo(
     "yt-thumbnail-view-model img"
   ) as HTMLImageElement | null;
 
-  // ✅ playlistId를 썸네일 URL로 사용하지 않음
   const thumbnail = imgEl?.src || "";
 
   return { playlistId, title, thumbnail };
@@ -93,24 +92,22 @@ export function injectChannelPlaylistCheckbox(
     display: "block",
   });
 
-  const stopNav = (e: Event) => {
-    e.stopImmediatePropagation();
+  // ✅ input에 직접 등록, 버블링 단계에서 stopPropagation
+  input.addEventListener("mousedown", (e) => e.stopPropagation());
+  input.addEventListener("pointerdown", (e) => e.stopPropagation());
+  input.addEventListener("touchstart", (e) => e.stopPropagation());
+
+  input.addEventListener("click", (e) => {
     e.stopPropagation();
-  };
+    // ✅ YouTube 네비게이션 차단은 wrapper 레벨에서
+  });
 
-  (["mousedown", "pointerdown", "touchstart"] as const).forEach(
-    (type) => wrapper.addEventListener(type, stopNav, { capture: true })
-  );
-
+  // ✅ wrapper는 네비게이션 차단용으로만 사용
   wrapper.addEventListener("click", (e) => {
     e.stopImmediatePropagation();
     e.stopPropagation();
-  }, { capture: true });
-
-  input.addEventListener("click", (e) => {
-    e.stopImmediatePropagation();
-    e.stopPropagation();
-  }, { capture: true });
+    e.preventDefault();
+  });
 
   input.addEventListener("change", (e) => {
     e.stopPropagation();

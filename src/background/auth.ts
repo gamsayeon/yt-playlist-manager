@@ -2,7 +2,7 @@ import { clearTempList } from "./storage";
 
 const STORAGE_KEY = "userId";
 const DISPLAY_NAME_KEY = "displayName";
-const HANDLE_KEY = "userHandle"; 
+const HANDLE_KEY = "userHandle";
 
 export async function getAuthToken(interactive: boolean): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -32,7 +32,6 @@ export async function refreshAuthToken(expiredToken?: string): Promise<string> {
   return getAuthToken(false);
 }
 
-/** YouTube 채널 정보 조회 (id + 채널명) */
 async function fetchUserInfo(
   token: string,
   isRetry = false
@@ -67,8 +66,6 @@ async function fetchUserInfo(
   };
 }
 
-/** 로그인 */
-// login() 수정
 export async function login(): Promise<string> {
   const token = await getAuthToken(true);
   const { userId, displayName, userHandle } = await fetchUserInfo(token);
@@ -76,15 +73,28 @@ export async function login(): Promise<string> {
   await chrome.storage.local.set({
     [STORAGE_KEY]: userId,
     [DISPLAY_NAME_KEY]: displayName,
-    [HANDLE_KEY]: userHandle, // ✅ 추가
+    [HANDLE_KEY]: userHandle,
   });
 
   return userId;
 }
 
-// logout() 수정
 export async function logout(): Promise<void> {
-  // ... 기존 코드 동일 ...
-  await chrome.storage.local.remove([STORAGE_KEY, DISPLAY_NAME_KEY, HANDLE_KEY]); // ✅ 추가
+  const token = await getAuthToken(false).catch(() => null);
+
+  if (token) {
+    await new Promise<void>((resolve, reject) => {
+      chrome.identity.removeCachedAuthToken({ token }, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError.message);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  // ✅ HANDLE_KEY 추가, 기존 토큰 제거 로직 복구
+  await chrome.storage.local.remove([STORAGE_KEY, DISPLAY_NAME_KEY, HANDLE_KEY]);
   await clearTempList();
 }
