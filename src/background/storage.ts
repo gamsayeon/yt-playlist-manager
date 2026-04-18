@@ -7,8 +7,7 @@ const STORAGE_KEYS = {
   CACHED_PLAYLISTS: "cachedPlaylists",
   CACHED_PLAYLISTS_AT: "cachedPlaylistsAt",
   USER_ID: "userId",
-  PLAYLIST_VIDEO_IDS: "playlistVideoIds",
-} as const;
+} as const; // ✅ PLAYLIST_VIDEO_IDS 제거
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -86,13 +85,35 @@ export async function removeFromTempList(videoId: string): Promise<void> {
   await operationPromise;
 }
 
-// ✅ playlistId 기반 배치 제거
+// ✅ 중복 영상 보호 로직 포함한 배치 제거
 export async function removeFromTempListByPlaylistId(
   playlistId: string
 ): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
-    const filtered = list.filter((item) => item.playlistId !== playlistId);
+
+    const videoIdsToRemove = new Set(
+      list
+        .filter((item) => item.playlistId === playlistId)
+        .map((item) => item.videoId)
+    );
+
+    // ✅ 다른 재생목록에도 포함된 영상은 보호
+    const protectedIds = new Set(
+      list
+        .filter(
+          (item) =>
+            item.playlistId !== playlistId &&
+            videoIdsToRemove.has(item.videoId)
+        )
+        .map((item) => item.videoId)
+    );
+
+    const filtered = list.filter(
+      (item) =>
+        item.playlistId !== playlistId || protectedIds.has(item.videoId)
+    );
+
     if (list.length !== filtered.length) {
       await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
     }
@@ -143,25 +164,6 @@ export async function invalidatePlaylists(): Promise<void> {
     STORAGE_KEYS.CACHED_PLAYLISTS,
     STORAGE_KEYS.CACHED_PLAYLISTS_AT,
   ]);
-}
-
-export async function setPlaylistVideoIds(
-  playlistId: string,
-  videoIds: string[]
-): Promise<void> {
-  await chrome.storage.local.set({
-    [`${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`]: videoIds,
-  });
-}
-
-// ✅ getPlaylistVideoIds 제거 (미사용)
-
-export async function removePlaylistVideoIds(
-  playlistId: string
-): Promise<void> {
-  await chrome.storage.local.remove(
-    `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`
-  );
 }
 
 export { STORAGE_KEYS };

@@ -9,8 +9,6 @@ import {
   getCachedPlaylists,
   setCachedPlaylists,
   invalidatePlaylists,
-  setPlaylistVideoIds,
-  removePlaylistVideoIds,
   Playlist,
 } from "./storage";
 import {
@@ -198,18 +196,10 @@ export function registerMessageHandler(): void {
         handleAsync(sendResponse, async () => {
           const allItems = await getPlaylistItems(playlistId);
 
+          // ✅ privacyStatus로 필터링 (언어 독립적)
           const filtered = isOwnChannel
             ? allItems
-            : allItems.filter(
-                (item) =>
-                  item.title !== "Private video" &&
-                  item.title !== "Deleted video"
-              );
-
-          await setPlaylistVideoIds(
-            playlistId,
-            filtered.map((item) => item.videoId)
-          );
+            : allItems.filter((item) => item.privacyStatus !== "private");
 
           // ✅ 배치 처리로 단일 스토리지 작업
           await addToTempListBatch(
@@ -234,10 +224,8 @@ export function registerMessageHandler(): void {
           return true;
         }
         handleAsync(sendResponse, async () => {
-          // ✅ 배치 처리로 단일 스토리지 작업
+          // ✅ 중복 영상 보호 로직 포함한 배치 제거
           await removeFromTempListByPlaylistId(playlistId);
-          await removePlaylistVideoIds(playlistId);
-
           const list = await getTempList();
           sendResponse({ success: true, list });
         });

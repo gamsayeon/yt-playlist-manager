@@ -50,6 +50,7 @@ export interface PlaylistItem {
   videoId: string;
   title: string;
   thumbnail: string;
+  privacyStatus: string; // ✅ 추가
 }
 
 interface YouTubePlaylistItemResponse {
@@ -63,6 +64,9 @@ interface YouTubePlaylistItemResponse {
       default?: { url: string };
       medium?: { url: string };
     };
+  };
+  status: {              // ✅ 추가
+    privacyStatus: string;
   };
 }
 
@@ -130,7 +134,6 @@ export async function getPlaylists(): Promise<Playlist[]> {
   return playlists;
 }
 
-// ✅ maxResults 선택적 파라미터로 변경 - 미지정 시 전체 조회
 export async function getPlaylistItems(
   playlistId: string,
   maxResults?: number
@@ -139,11 +142,11 @@ export async function getPlaylistItems(
   let pageToken: string | undefined;
 
   do {
-    // ✅ 요청된 개수에 맞춰 API 호출 제한 (미지정 시 전체)
     const remaining = maxResults !== undefined ? maxResults - items.length : Infinity;
     const clampedMaxResults = Math.min(remaining, 50);
 
-    const url = `${BASE_URL}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${clampedMaxResults}${
+    // ✅ part에 status 추가
+    const url = `${BASE_URL}/playlistItems?part=snippet,status&playlistId=${playlistId}&maxResults=${clampedMaxResults}${
       pageToken ? `&pageToken=${pageToken}` : ""
     }`;
 
@@ -160,6 +163,7 @@ export async function getPlaylistItems(
           item.snippet.thumbnails?.medium?.url ??
           item.snippet.thumbnails?.default?.url ??
           `https://i.ytimg.com/vi/${item.snippet.resourceId.videoId}/mqdefault.jpg`,
+        privacyStatus: item.status.privacyStatus, // ✅ 추가
       });
     });
 

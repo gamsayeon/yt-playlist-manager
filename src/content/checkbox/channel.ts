@@ -25,7 +25,6 @@ export function injectChannelCheckbox(item: Element, videoInfo: VideoInfo): void
   injectInto(anchor, videoInfo);
 }
 
-// ✅ 채널 재생목록 탭 파싱 (내 채널 + 다른 채널 모두 동일 구조)
 export function parseChannelPlaylistInfo(
   item: Element
 ): { playlistId: string; title: string; thumbnail: string } | null {
@@ -49,14 +48,13 @@ export function parseChannelPlaylistInfo(
   const imgEl = item.querySelector(
     "yt-thumbnail-view-model img"
   ) as HTMLImageElement | null;
-  const thumbnail =
-    imgEl?.src ||
-    `https://i.ytimg.com/vi/${playlistId}/mqdefault.jpg`;
+
+  // ✅ playlistId를 썸네일 URL로 사용하지 않음
+  const thumbnail = imgEl?.src || "";
 
   return { playlistId, title, thumbnail };
 }
 
-// ✅ 채널 재생목록 체크박스 주입
 export function injectChannelPlaylistCheckbox(
   item: Element,
   info: { playlistId: string; title: string; thumbnail: string },
@@ -68,12 +66,6 @@ export function injectChannelPlaylistCheckbox(
   if (host.querySelector("[data-ytpm-playlist-checkbox]")) return;
 
   host.style.position = "relative";
-
-  // ✅ yt-touch-feedback-shape의 pointer-events를 none으로
-  const touchFeedback = host.querySelector("yt-touch-feedback-shape") as HTMLElement | null;
-  if (touchFeedback) {
-    touchFeedback.style.pointerEvents = "none";
-  }
 
   const wrapper = document.createElement("div");
   wrapper.setAttribute("data-ytpm-playlist-checkbox", "true");
