@@ -2,13 +2,13 @@
 import { registerMessageHandler } from "../../background/message-handler";
 
 jest.mock("../../background/youtube-api", () => ({
-  getPlaylists: jest.fn(),
-  getPlaylistItems: jest.fn(),
+  getPlaylists: jest.fn().mockResolvedValue([]),
+  getPlaylistItems: jest.fn().mockResolvedValue([]),
   createPlaylist: jest.fn(),
   updatePlaylist: jest.fn(),
   deletePlaylist: jest.fn(),
-  addItemToPlaylist: jest.fn(),
-  removeItemFromPlaylist: jest.fn(),
+  addItemToPlaylist: jest.fn().mockResolvedValue(undefined),
+  removeItemFromPlaylist: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../background/auth", () => ({
@@ -28,14 +28,16 @@ jest.mock("../../background/storage", () => ({
   invalidatePlaylists: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { getPlaylistItems } from "../../background/youtube-api";
+import { getPlaylistItems, createPlaylist, deletePlaylist } from "../../background/youtube-api";
 import {
   getTempList,
   addToTempListBatch,
   removeFromTempListByPlaylistId,
+  clearTempList,
+  getCachedPlaylists,
+  setCachedPlaylists,
 } from "../../background/storage";
 
-// ✅ 리스너 반환값 확인으로 pending 방지
 const sendMessage = (
   message: unknown,
   senderId = "test-extension-id"
@@ -71,7 +73,10 @@ describe("GET_TEMP_LIST", () => {
 
 describe("GET_PLAYLIST_ITEMS_FOR_TEMP", () => {
   it("payload 없으면 실패", async () => {
-    const res = await sendMessage({ type: "GET_PLAYLIST_ITEMS_FOR_TEMP", payload: {} }) as { success: boolean };
+    const res = await sendMessage({
+      type: "GET_PLAYLIST_ITEMS_FOR_TEMP",
+      payload: {},
+    }) as { success: boolean };
     expect(res.success).toBe(false);
   });
 
@@ -80,7 +85,6 @@ describe("GET_PLAYLIST_ITEMS_FOR_TEMP", () => {
       { videoId: "v1", title: "공개", thumbnail: "", privacyStatus: "public", playlistItemId: "i1" },
       { videoId: "v2", title: "비공개", thumbnail: "", privacyStatus: "private", playlistItemId: "i2" },
     ]);
-    (getTempList as jest.Mock).mockResolvedValueOnce([]);
 
     const res = await sendMessage({
       type: "GET_PLAYLIST_ITEMS_FOR_TEMP",
@@ -99,7 +103,6 @@ describe("GET_PLAYLIST_ITEMS_FOR_TEMP", () => {
       { videoId: "v1", title: "공개", thumbnail: "", privacyStatus: "public", playlistItemId: "i1" },
       { videoId: "v2", title: "비공개", thumbnail: "", privacyStatus: "private", playlistItemId: "i2" },
     ]);
-    (getTempList as jest.Mock).mockResolvedValueOnce([]);
 
     const res = await sendMessage({
       type: "GET_PLAYLIST_ITEMS_FOR_TEMP",
@@ -113,12 +116,14 @@ describe("GET_PLAYLIST_ITEMS_FOR_TEMP", () => {
 
 describe("REMOVE_PLAYLIST_ITEMS_FROM_TEMP", () => {
   it("payload 없으면 실패", async () => {
-    const res = await sendMessage({ type: "REMOVE_PLAYLIST_ITEMS_FROM_TEMP", payload: {} }) as { success: boolean };
+    const res = await sendMessage({
+      type: "REMOVE_PLAYLIST_ITEMS_FROM_TEMP",
+      payload: {},
+    }) as { success: boolean };
     expect(res.success).toBe(false);
   });
 
   it("재생목록 영상 일괄 제거", async () => {
-    (getTempList as jest.Mock).mockResolvedValueOnce([]);
     const res = await sendMessage({
       type: "REMOVE_PLAYLIST_ITEMS_FROM_TEMP",
       payload: { playlistId: "pl1" },
@@ -126,6 +131,134 @@ describe("REMOVE_PLAYLIST_ITEMS_FROM_TEMP", () => {
 
     expect(res.success).toBe(true);
     expect(removeFromTempListByPlaylistId).toHaveBeenCalledWith("pl1");
+  });
+});
+
+describe("CREATE_PLAYLIST", () => {
+  it("payload 없으면 실패", async () => {
+    const res = await sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: {},
+    }) as { success: boolean };
+    expect(res.success).toBe(false);
+  });
+
+  it("tempList 비어있으면 실패", async () => {
+    (getTempList as jest.Mock).mockResolvedValueOnce([]);
+    const res = await sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: { title: "새 재생목록" },
+    }) as { success: boolean; error: string };
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("재생목록에 추가할 영상이 없습니다.");
+  });
+
+  it("재생목록 생성 성공", async () => {
+    (getTempList as jest.Mock).mockResolvedValueOnce([
+      { videoId: "v1", title: "영상1", thumbnail: "" },
+    ]);
+    (createPlaylist as jest.Mock).mockResolvedValueOnce({
+      id: "new-pl",
+      title: "새 재생목록",
+      description: "",
+      privacyStatus: "private",
+      itemCount: 0,
+      publishedAt: "2024-01-01",
+    });
+    (getCachedPlaylists as jest.Mock).mockResolvedValueOnce([]);
+
+    const res = await sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: { title: "새 재생목록" },
+    }) as { success: boolean; playlist: { id: string } };
+
+    expect(res.success).toBe(true);
+    expect(res.playlist.id).toBe("new-pl");
+    expect(clearTempList).toHaveBeenCalled();
+  });
+
+  it("영상 추가 실패 시 재생목록 롤백", async () => {
+    (getTempList as jest.Mock).mockResolvedValueOnce([
+      { videoId: "v1", title: "영상1", thumbnail: "" },
+    ]);
+    (createPlaylist as jest.Mock).mockResolvedValueOnce({
+      id: "new-pl",
+      title: "새 재생목록",
+      description: "",
+      privacyStatus: "private",
+      itemCount: 0,
+      publishedAt: "2024-01-01",
+    });
+    const { addItemToPlaylist } = jest.requireMock("../../background/youtube-api");
+    (addItemToPlaylist as jest.Mock).mockRejectedValueOnce(new Error("추가 실패"));
+
+    const res = await sendMessage({
+      type: "CREATE_PLAYLIST",
+      payload: { title: "새 재생목록" },
+    }) as { success: boolean };
+
+    expect(res.success).toBe(false);
+    expect(deletePlaylist).toHaveBeenCalledWith("new-pl");
+  });
+});
+
+describe("UPDATE_PLAYLIST", () => {
+  it("payload 없으면 실패", async () => {
+    const res = await sendMessage({
+      type: "UPDATE_PLAYLIST",
+      payload: { playlistId: "pl1" },
+    }) as { success: boolean };
+    expect(res.success).toBe(false);
+  });
+
+  it("재생목록 수정 성공", async () => {
+    const { updatePlaylist } = jest.requireMock("../../background/youtube-api");
+    (updatePlaylist as jest.Mock).mockResolvedValueOnce({
+      id: "pl1",
+      title: "수정된 제목",
+      description: "",
+      privacyStatus: "public",
+      itemCount: 3,
+      publishedAt: "2024-01-01",
+    });
+    (getCachedPlaylists as jest.Mock).mockResolvedValueOnce([
+      { id: "pl1", title: "기존 제목", description: "", privacyStatus: "private", itemCount: 3, publishedAt: "2024-01-01" },
+    ]);
+
+    const res = await sendMessage({
+      type: "UPDATE_PLAYLIST",
+      payload: { playlistId: "pl1", title: "수정된 제목", privacyStatus: "public" },
+    }) as { success: boolean; playlists: { title: string }[] };
+
+    expect(res.success).toBe(true);
+    expect(res.playlists[0].title).toBe("수정된 제목");
+    expect(setCachedPlaylists).toHaveBeenCalled();
+  });
+});
+
+describe("DELETE_PLAYLIST", () => {
+  it("payload 없으면 실패", async () => {
+    const res = await sendMessage({
+      type: "DELETE_PLAYLIST",
+      payload: {},
+    }) as { success: boolean };
+    expect(res.success).toBe(false);
+  });
+
+  it("재생목록 삭제 성공", async () => {
+    (getCachedPlaylists as jest.Mock).mockResolvedValueOnce([
+      { id: "pl1", title: "삭제할 재생목록", description: "", privacyStatus: "private", itemCount: 0, publishedAt: "2024-01-01" },
+      { id: "pl2", title: "유지할 재생목록", description: "", privacyStatus: "public", itemCount: 5, publishedAt: "2024-01-01" },
+    ]);
+
+    const res = await sendMessage({
+      type: "DELETE_PLAYLIST",
+      payload: { playlistId: "pl1" },
+    }) as { success: boolean; playlists: { id: string }[] };
+
+    expect(res.success).toBe(true);
+    expect(res.playlists).toHaveLength(1);
+    expect(res.playlists[0].id).toBe("pl2");
   });
 });
 

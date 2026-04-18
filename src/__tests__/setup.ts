@@ -1,7 +1,6 @@
 /// <reference types="jest" />
-import "jest-chrome";
 
-(globalThis as unknown as Record<string, unknown>).chrome = {
+;(globalThis as unknown as Record<string, unknown>).chrome = {
   storage: {
     local: {
       get: jest.fn(),
