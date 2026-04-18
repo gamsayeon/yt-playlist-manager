@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+import "jest-chrome";
 
 (globalThis as unknown as Record<string, unknown>).chrome = {
   storage: {

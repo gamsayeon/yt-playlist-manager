@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { registerMessageHandler } from "../../background/message-handler";
 
 jest.mock("../../background/youtube-api", () => ({
@@ -34,15 +35,21 @@ import {
   removeFromTempListByPlaylistId,
 } from "../../background/storage";
 
+// ✅ 리스너 반환값 확인으로 pending 방지
 const sendMessage = (
   message: unknown,
-  senderId = chrome.runtime.id
+  senderId = "test-extension-id"
 ): Promise<unknown> => {
   return new Promise((resolve) => {
     const sender = { id: senderId } as chrome.runtime.MessageSender;
     const listeners = (chrome.runtime.onMessage.addListener as jest.Mock).mock.calls;
     const listener = listeners[listeners.length - 1][0];
-    listener(message, sender, resolve);
+    let called = false;
+    const isAsync = listener(message, sender, (res: unknown) => {
+      called = true;
+      resolve(res);
+    });
+    if (isAsync !== true && !called) resolve(undefined);
   });
 };
 

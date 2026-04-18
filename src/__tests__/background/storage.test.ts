@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import {
   getTempList,
   addToTempList,
@@ -168,9 +169,13 @@ describe("getCachedPlaylists / setCachedPlaylists / invalidatePlaylists", () => 
     expect(await getCachedPlaylists()).toBeNull();
   });
 
+  // ✅ jest.useFakeTimers()로 시간 제어
   it("TTL 만료 시 null 반환", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date());
     await setCachedPlaylists(playlists);
-    mockStorage["cachedPlaylistsAt"] = Date.now() - 6 * 60 * 1000;
+    jest.advanceTimersByTime(6 * 60 * 1000);
     expect(await getCachedPlaylists()).toBeNull();
+    jest.useRealTimers();
   });
 });
