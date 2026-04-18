@@ -7,6 +7,8 @@ import {
   getCachedPlaylists,
   setCachedPlaylists,
   invalidatePlaylists,
+  setPlaylistVideoIds,
+  removePlaylistVideoIds, 
   Playlist,
 } from "./storage";
 import {
@@ -194,17 +196,59 @@ export function registerMessageHandler(): void {
         handleAsync(sendResponse, async () => {
           const allItems = await getPlaylistItems(playlistId);
 
-          // ✅ 본인 채널이면 전체, 아니면 private 제외
           const filtered = isOwnChannel
             ? allItems
-            : allItems.filter((item) => {
-                // PlaylistItem에 privacyStatus가 없으므로
-                // title이 "Private video"인 항목 제외
-                return item.title !== "Private video" && item.title !== "Deleted video";
-              });
+            : allItems.filter(
+                (item) =>
+                  item.title !== "Private video" &&
+                  item.title !== "Deleted video"
+              );
 
-          console.log("[YTPM] 재생목록 영상 조회 결과:", filtered);
-          sendResponse({ success: true, playlistItems: filtered });
+          // ✅ 재생목록 영상 videoId 캐싱
+          await setPlaylistVideoIds(playlistId, filtered.map((item) => item.videoId));
+
+          const currentList = await getTempList();
+          const existingIds = new Set(currentList.map((v) => v.videoId));
+
+          for (const item of filtered) {
+            if (existingIds.has(item.videoId)) continue;
+            await addToTempList({
+              videoId: item.videoId,
+              title: item.title,
+              thumbnail: item.thumbnail,
+              playlistId, // ✅ 추가
+            });
+          }
+
+          const list = await getTempList();
+          sendResponse({ success: true, playlistItems: filtered, list });
+        });
+        return true;
+      }
+
+      case "REMOVE_PLAYLIST_ITEMS_FROM_TEMP": {
+        const { playlistId } = message.payload ?? {};
+        if (!playlistId) {
+          sendResponse({ success: false, error: "Invalid payload" });
+          return true;
+        }
+        handleAsync(sendResponse, async () => {
+          const currentList = await getTempList();
+          const removeIds = new Set(
+            currentList
+              .filter((item) => item.playlistId === playlistId)
+              .map((item) => item.videoId)
+          );
+
+          for (const videoId of removeIds) {
+            await removeFromTempList(videoId);
+          }
+
+          // ✅ 캐시 제거
+          await removePlaylistVideoIds(playlistId);
+
+          const list = await getTempList();
+          sendResponse({ success: true, list });
         });
         return true;
       }

@@ -32,10 +32,8 @@ export function parseChannelPlaylistInfo(
   const host = item.querySelector(".ytLockupViewModelHost") as HTMLElement | null;
   if (!host) return null;
 
-  // ✅ 컬렉션(재생목록) 카드인지 확인
   if (!host.classList.contains("ytLockupViewModelCollectionStack2")) return null;
 
-  // ✅ content-id-{playlistId} 클래스에서 playlistId 추출
   const contentIdClass = Array.from(host.classList).find((c) =>
     c.startsWith("content-id-")
   );
@@ -71,6 +69,12 @@ export function injectChannelPlaylistCheckbox(
 
   host.style.position = "relative";
 
+  // ✅ yt-touch-feedback-shape의 pointer-events를 none으로
+  const touchFeedback = host.querySelector("yt-touch-feedback-shape") as HTMLElement | null;
+  if (touchFeedback) {
+    touchFeedback.style.pointerEvents = "none";
+  }
+
   const wrapper = document.createElement("div");
   wrapper.setAttribute("data-ytpm-playlist-checkbox", "true");
   wrapper.dataset.playlistId = info.playlistId;
@@ -83,6 +87,7 @@ export function injectChannelPlaylistCheckbox(
     height: "20px",
     cursor: "pointer",
     isolation: "isolate",
+    pointerEvents: "auto",
   });
 
   const input = document.createElement("input");
@@ -96,29 +101,23 @@ export function injectChannelPlaylistCheckbox(
     display: "block",
   });
 
-  // ✅ wrapper 클릭: 네비게이션만 막고 input으로 전달은 허용
   const stopNav = (e: Event) => {
     e.stopImmediatePropagation();
     e.stopPropagation();
-    // ❌ preventDefault 없음 — checkbox 동작 유지
   };
 
   (["mousedown", "pointerdown", "touchstart"] as const).forEach(
     (type) => wrapper.addEventListener(type, stopNav, { capture: true })
   );
 
-  // wrapper의 click — preventDefault 제거
   wrapper.addEventListener("click", (e) => {
     e.stopImmediatePropagation();
     e.stopPropagation();
-    // ❌ e.preventDefault() 제거 — 얘가 체크박스 토글을 막고 있었음
   }, { capture: true });
 
-  // ✅ input 클릭 시 직접 change 트리거 (가장 확실한 방법)
   input.addEventListener("click", (e) => {
     e.stopImmediatePropagation();
     e.stopPropagation();
-    // preventDefault 없음
   }, { capture: true });
 
   input.addEventListener("change", (e) => {

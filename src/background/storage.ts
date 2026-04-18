@@ -7,7 +7,36 @@ const STORAGE_KEYS = {
   CACHED_PLAYLISTS: "cachedPlaylists",
   CACHED_PLAYLISTS_AT: "cachedPlaylistsAt",
   USER_ID: "userId",
+  PLAYLIST_VIDEO_IDS: "playlistVideoIds",
 } as const;
+
+/** 재생목록 영상 videoId 목록 캐싱 */
+export async function setPlaylistVideoIds(
+  playlistId: string,
+  videoIds: string[]
+): Promise<void> {
+  await chrome.storage.local.set({
+    [`${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`]: videoIds,
+  });
+}
+
+/** 재생목록 영상 videoId 목록 조회 */
+export async function getPlaylistVideoIds(
+  playlistId: string
+): Promise<string[] | null> {
+  const key = `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`;
+  const result = await chrome.storage.local.get(key);
+  return result[key] ?? null;
+}
+
+/** 재생목록 영상 videoId 캐시 제거 */
+export async function removePlaylistVideoIds(
+  playlistId: string
+): Promise<void> {
+  await chrome.storage.local.remove(
+    `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`
+  );
+}
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
