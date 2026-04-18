@@ -57,7 +57,7 @@ function tryInjectRichItem(item: Element): void {
 
   // ✅ 재생목록 카드는 스킵 (yt-lockup-view-model 루프에서 처리)
   if (item.querySelector(".ytLockupViewModelCollectionStack2")) return;
-  
+
   const processed = (item as HTMLElement).dataset.ytpmProcessed;
   const currentVideoId = getVideoId(item);
 
@@ -236,7 +236,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const list: VideoItem[] = changes.tempList.newValue ?? [];
     const checkedIds = new Set(list.map((v) => v.videoId));
 
-    // 기존 개별 영상 체크박스 동기화
     document.querySelectorAll("[data-ytpm-checkbox]").forEach((cb) => {
       const input = cb.querySelector("input") as HTMLInputElement | null;
       const videoId = (cb as HTMLElement).dataset.videoId;
@@ -246,17 +245,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
       }
     });
 
-    // ✅ 재생목록 체크박스 동기화
+    // ✅ Set으로 O(1) 조회 최적화
+    const playlistIdsInTemp = new Set(
+      list.map((v) => v.playlistId).filter(Boolean)
+    );
     document.querySelectorAll("[data-ytpm-playlist-checkbox]").forEach((cb) => {
       const input = cb.querySelector("input") as HTMLInputElement | null;
       const playlistId = (cb as HTMLElement).dataset.playlistId;
-      if (!input || !playlistId) return;
-
-      // 해당 재생목록 소속 영상 목록
-      const playlistItems = list.filter((v) => v.playlistId === playlistId);
-      
-      // tempList에 이 재생목록 영상이 하나도 없으면 체크 해제
-      input.checked = playlistItems.length > 0;
+      if (input && playlistId) {
+        input.checked = playlistIdsInTemp.has(playlistId);
+      }
     });
   }
 });

@@ -10,34 +10,6 @@ const STORAGE_KEYS = {
   PLAYLIST_VIDEO_IDS: "playlistVideoIds",
 } as const;
 
-/** 재생목록 영상 videoId 목록 캐싱 */
-export async function setPlaylistVideoIds(
-  playlistId: string,
-  videoIds: string[]
-): Promise<void> {
-  await chrome.storage.local.set({
-    [`${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`]: videoIds,
-  });
-}
-
-/** 재생목록 영상 videoId 목록 조회 */
-export async function getPlaylistVideoIds(
-  playlistId: string
-): Promise<string[] | null> {
-  const key = `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`;
-  const result = await chrome.storage.local.get(key);
-  return result[key] ?? null;
-}
-
-/** 재생목록 영상 videoId 캐시 제거 */
-export async function removePlaylistVideoIds(
-  playlistId: string
-): Promise<void> {
-  await chrome.storage.local.remove(
-    `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`
-  );
-}
-
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
 export interface Playlist {
@@ -49,38 +21,32 @@ export interface Playlist {
   publishedAt: string;
 }
 
-const TTL_MS = 5 * 60 * 1000; // 5분
+const TTL_MS = 5 * 60 * 1000;
 
 let tempListQueue: Promise<void> = Promise.resolve();
 
-/** 단일 키 조회 */
 export async function getStorage<T>(key: StorageKey): Promise<T | null> {
   const result = await chrome.storage.local.get(key);
   return result[key] ?? null;
 }
 
-/** 단일 키 저장 */
 export async function setStorage<T>(key: StorageKey, value: T): Promise<void> {
   await chrome.storage.local.set({ [key]: value });
 }
 
-/** 단일 키 삭제 */
 export async function removeStorage(key: StorageKey): Promise<void> {
   await chrome.storage.local.remove(key);
 }
 
-/** 전체 스토리지 초기화 */
 export async function clearStorage(): Promise<void> {
   await chrome.storage.local.clear();
 }
 
-/** 임시 리스트 조회 */
 export async function getTempList(): Promise<VideoItem[]> {
   const list = await getStorage<VideoItem[]>(STORAGE_KEYS.TEMP_LIST);
   return list ?? [];
 }
 
-/** 임시 리스트에 영상 추가 */
 export async function addToTempList(video: VideoItem): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
@@ -93,7 +59,20 @@ export async function addToTempList(video: VideoItem): Promise<void> {
   await operationPromise;
 }
 
-/** 임시 리스트에서 영상 제거 */
+// ✅ 배치 추가
+export async function addToTempListBatch(videos: VideoItem[]): Promise<void> {
+  const operationPromise = tempListQueue.then(async () => {
+    const list = await getTempList();
+    const existingIds = new Set(list.map((item) => item.videoId));
+    const newItems = videos.filter((v) => !existingIds.has(v.videoId));
+    if (newItems.length === 0) return;
+    await setStorage(STORAGE_KEYS.TEMP_LIST, [...list, ...newItems]);
+  });
+
+  tempListQueue = operationPromise.catch(() => {});
+  await operationPromise;
+}
+
 export async function removeFromTempList(videoId: string): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     const list = await getTempList();
@@ -107,7 +86,22 @@ export async function removeFromTempList(videoId: string): Promise<void> {
   await operationPromise;
 }
 
-/** 임시 리스트 전체 초기화 */
+// ✅ playlistId 기반 배치 제거
+export async function removeFromTempListByPlaylistId(
+  playlistId: string
+): Promise<void> {
+  const operationPromise = tempListQueue.then(async () => {
+    const list = await getTempList();
+    const filtered = list.filter((item) => item.playlistId !== playlistId);
+    if (list.length !== filtered.length) {
+      await setStorage(STORAGE_KEYS.TEMP_LIST, filtered);
+    }
+  });
+
+  tempListQueue = operationPromise.catch(() => {});
+  await operationPromise;
+}
+
 export async function clearTempList(): Promise<void> {
   const operationPromise = tempListQueue.then(async () => {
     await removeStorage(STORAGE_KEYS.TEMP_LIST);
@@ -117,7 +111,6 @@ export async function clearTempList(): Promise<void> {
   await operationPromise;
 }
 
-/** 캐시된 재생목록 조회 (5분 TTL) */
 export async function getCachedPlaylists(): Promise<Playlist[] | null> {
   const items = await chrome.storage.local.get([
     STORAGE_KEYS.CACHED_PLAYLISTS_AT,
@@ -138,7 +131,6 @@ export async function getCachedPlaylists(): Promise<Playlist[] | null> {
   return playlists as Playlist[];
 }
 
-/** 캐시된 재생목록 저장 */
 export async function setCachedPlaylists(playlists: Playlist[]): Promise<void> {
   await chrome.storage.local.set({
     [STORAGE_KEYS.CACHED_PLAYLISTS]: playlists,
@@ -146,12 +138,30 @@ export async function setCachedPlaylists(playlists: Playlist[]): Promise<void> {
   });
 }
 
-/** 캐시 무효화 */
 export async function invalidatePlaylists(): Promise<void> {
   await chrome.storage.local.remove([
     STORAGE_KEYS.CACHED_PLAYLISTS,
     STORAGE_KEYS.CACHED_PLAYLISTS_AT,
   ]);
+}
+
+export async function setPlaylistVideoIds(
+  playlistId: string,
+  videoIds: string[]
+): Promise<void> {
+  await chrome.storage.local.set({
+    [`${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`]: videoIds,
+  });
+}
+
+// ✅ getPlaylistVideoIds 제거 (미사용)
+
+export async function removePlaylistVideoIds(
+  playlistId: string
+): Promise<void> {
+  await chrome.storage.local.remove(
+    `${STORAGE_KEYS.PLAYLIST_VIDEO_IDS}:${playlistId}`
+  );
 }
 
 export { STORAGE_KEYS };
